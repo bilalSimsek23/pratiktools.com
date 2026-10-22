@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_superuser_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+
+    env:
+      # Overrides the local defaults in phpunit.xml.
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: saas_testing
+      DB_PASSWORD: ci_app_password
+      DB_OWNER_PASSWORD: ci_owner_password
+      DB_PLATFORM_PASSWORD: ci_platform_password
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_pgsql, pgsql, pcntl, posix, sodium
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit dependencies
+        run: composer audit
+
+      - name: Create database roles
+        env:
+          PGHOST: 127.0.0.1
+          PGPASSWORD: ci_superuser_password
+          POSTGRES_USER: postgres
+          SAAS_DATABASES: saas_testing
+          DB_APP_PASSWORD: ci_app_password
+        run: sh docker/postgres/bootstrap-roles.sh
+
+      - name: Code style (Pint)
+        run: vendor/bin/pint --test
+
+      - name: Static analysis (Larastan)
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+      - name: Migrations from zero, full rollback, and again
+        run: |
+          php artisan migrate --database=pgsql_owner --force --env=testing
+          php artisan migrate:rollback --database=pgsql_owner --force --env=testing
+          test "$(PGPASSWORD=ci_superuser_password psql -h 127.0.0.1 -U postgres -d saas_testing -tAc "select count(*) from pg_tables where schemaname='public' and tablename <> 'migrations'")" = "0"
+          php artisan migrate --database=pgsql_owner --force --env=testing
+
+      - name: Unit tests
+        run: vendor/bin/phpunit --testsuite=Unit
+
+      - name: Tenant isolation tests
+        run: vendor/bin/phpunit --group=tenant-isolation
+
+      - name: Feature tests
+        run: vendor/bin/phpunit --testsuite=Feature
