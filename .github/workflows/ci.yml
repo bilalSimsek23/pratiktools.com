@@ -35,6 +35,7 @@ jobs:
           --health-interval 3s --health-timeout 3s --health-retries 20
 
     env:
+      APP_ENV: testing
       # Overrides the local defaults in phpunit.xml.
       DB_HOST: 127.0.0.1
       DB_PORT: 5432

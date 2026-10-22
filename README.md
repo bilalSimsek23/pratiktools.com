@@ -31,7 +31,7 @@ with reserved IPs and list them in `EGRESS_STATIC_IPS`.
 Requirements: Docker, PHP 8.4 with `pdo_pgsql` and `pcntl`, Composer.
 
 ```sh
-cp .env.example .env
+cp .env.example .env                    # before composer install
 composer install
 php artisan key:generate
 php artisan vault:generate-local-keys   # paste the three values into .env

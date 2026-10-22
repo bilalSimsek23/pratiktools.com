@@ -9,9 +9,15 @@ use RuntimeException;
  */
 final class ProductionGuard
 {
+    /**
+     * Build-time commands that never serve traffic (composer install runs
+     * package:discover before any environment file exists).
+     */
+    private const BUILD_COMMANDS = ['package:discover', 'vendor:publish', 'list', 'help', 'about', 'env'];
+
     public static function assertSafe(): void
     {
-        if (! app()->environment(['production', 'staging'])) {
+        if (! app()->environment(['production', 'staging']) || self::isBuildCommand()) {
             return;
         }
 
@@ -38,5 +44,10 @@ final class ProductionGuard
         if ($problems !== []) {
             throw new RuntimeException('Unsafe configuration: '.implode('; ', $problems).'.');
         }
+    }
+
+    private static function isBuildCommand(): bool
+    {
+        return app()->runningInConsole() && in_array($_SERVER['argv'][1] ?? null, self::BUILD_COMMANDS, true);
     }
 }
