@@ -1,0 +1,72 @@
+# Local development stack. Not used for staging or production.
+x-app: &app
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  volumes:
+    - .:/var/www/html
+  env_file: .env
+  environment:
+    DB_HOST: postgres
+    DB_PORT: 5432
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: local_superuser_password
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:-local_owner_password}
+      DB_APP_PASSWORD: ${DB_PASSWORD:-local_app_password}
+      DB_PLATFORM_PASSWORD: ${DB_PLATFORM_PASSWORD:-local_platform_password}
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/bootstrap-roles.sh:/docker-entrypoint-initdb.d/10-bootstrap-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:63799:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    <<: *app
+    # PHP's built-in server directly (not `artisan serve`, which drops the
+    # container environment for its worker processes).
+    working_dir: /var/www/html/public
+    command: ["php", "-S", "0.0.0.0:8000", "../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"]
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  horizon:
+    <<: *app
+    command: ["php", "artisan", "horizon"]
+
+  scheduler:
+    <<: *app
+    command: ["php", "artisan", "schedule:work"]
+
+volumes:
+  postgres-data:
+  redis-data:

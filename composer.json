@@ -1,17 +1,25 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "igs/marketing-automation-saas",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "Multi-tenant marketing automation platform for Ticimax stores.",
+    "keywords": [
+        "laravel",
+        "framework"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.3",
         "laravel/framework": "^13.17",
-        "laravel/tinker": "^3.0"
+        "laravel/horizon": "^5.50",
+        "laravel/sanctum": "^4.3",
+        "laravel/tinker": "^3.0",
+        "pragmarx/google2fa": "^9.1",
+        "predis/predis": "^3.7"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.13",
         "laravel/pail": "^1.2.5",
         "laravel/pao": "^1.0.6",
         "laravel/pint": "^1.27",
@@ -45,8 +53,8 @@
             "@php artisan dev"
         ],
         "test": [
-            "@php artisan config:clear --ansi @no_additional_args",
-            "@php artisan test"
+            "@php artisan config:clear --ansi",
+            "vendor/bin/phpunit"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
@@ -65,6 +73,23 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "migrate:owner": [
+            "@php artisan migrate --database=pgsql_owner --force"
+        ],
+        "lint": [
+            "vendor/bin/pint --test"
+        ],
+        "analyse": [
+            "vendor/bin/phpstan analyse --no-progress --memory-limit=1G"
+        ],
+        "test:isolation": [
+            "vendor/bin/phpunit --group=tenant-isolation"
+        ],
+        "ci": [
+            "@lint",
+            "@analyse",
+            "@test"
         ]
     },
     "extra": {

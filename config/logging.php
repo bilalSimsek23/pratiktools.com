@@ -1,5 +1,6 @@
 <?php
 
+use App\Logging\UseStructuredJson;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -18,7 +19,7 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'stack'),
+    'default' => env('LOG_CHANNEL', 'json'),
 
     /*
     |--------------------------------------------------------------------------
@@ -56,6 +57,25 @@ return [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),
             'ignore_exceptions' => false,
+        ],
+
+        // Structured JSON logs with correlation fields and redaction. Default
+        // for every environment; containers can switch to json_stderr.
+        'json' => [
+            'driver' => 'daily',
+            'path' => env('LOG_JSON_PATH', storage_path('logs/app.log')),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 14,
+            'replace_placeholders' => true,
+            'tap' => [UseStructuredJson::class],
+        ],
+
+        'json_stderr' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'info'),
+            'handler' => StreamHandler::class,
+            'handler_with' => ['stream' => 'php://stderr'],
+            'tap' => [UseStructuredJson::class],
         ],
 
         'single' => [

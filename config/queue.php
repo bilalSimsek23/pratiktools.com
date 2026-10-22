@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => env('QUEUE_CONNECTION', 'database'),
+    'default' => env('QUEUE_CONNECTION', 'redis'),
 
     /*
     |--------------------------------------------------------------------------
@@ -67,10 +67,12 @@ return [
         'redis' => [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
-            'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            'queue' => env('REDIS_QUEUE', 'system'),
+            // Longer than the longest Horizon timeout (300s).
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 330),
             'block_for' => null,
-            'after_commit' => false,
+            // Jobs dispatched inside a transaction are pushed only after commit.
+            'after_commit' => true,
         ],
 
         'deferred' => [
