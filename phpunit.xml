@@ -3,6 +3,8 @@
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          colors="true"
+         failOnRisky="true"
+         failOnWarning="true"
 >
     <testsuites>
         <testsuite name="Unit">
@@ -18,17 +20,47 @@
         </include>
     </source>
     <php>
+        <!-- Tests run against real PostgreSQL (RLS) and Redis. CI overrides
+             host/port through the environment; these are local defaults. -->
         <env name="APP_ENV" value="testing"/>
+        <env name="APP_DEBUG" value="false"/>
+        <env name="APP_KEY" value="base64:dGVzdGluZy1vbmx5LWFwcC1rZXktbm90LXNlY3JldDA="/>
+        <env name="ADMIN_DOMAIN" value="admin.saas.test"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="DB_CONNECTION" value="pgsql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="54329"/>
+        <env name="DB_DATABASE" value="saas_testing"/>
+        <env name="DB_USERNAME" value="saas_app"/>
+        <env name="DB_PASSWORD" value="local_app_password"/>
+        <env name="DB_OWNER_USERNAME" value="saas_owner"/>
+        <env name="DB_OWNER_PASSWORD" value="local_owner_password"/>
+        <env name="DB_PLATFORM_USERNAME" value="saas_platform"/>
+        <env name="DB_PLATFORM_PASSWORD" value="local_platform_password"/>
         <env name="DB_URL" value=""/>
+        <env name="REDIS_CLIENT" value="predis"/>
+        <env name="REDIS_HOST" value="127.0.0.1"/>
+        <env name="REDIS_PORT" value="63799"/>
+        <env name="REDIS_DB" value="5"/>
+        <env name="REDIS_CACHE_DB" value="6"/>
+        <env name="REDIS_PREFIX" value="saas-test:"/>
+        <env name="LOG_CHANNEL" value="json"/>
+        <env name="LOG_LEVEL" value="debug"/>
+        <env name="LOG_JSON_PATH" value="storage/logs/testing.log"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <env name="SESSION_SECURE_COOKIE" value="false"/>
+        <!-- Test-only keys. Not secrets; never used outside the test suite. -->
+        <env name="SECRET_VAULT_KEK_DRIVER" value="local"/>
+        <env name="SECRET_VAULT_LOCAL_KEK_ID" value="test-v1"/>
+        <env name="SECRET_VAULT_LOCAL_KEK" value="dGVzdGluZy1vbmx5LWtlay1ub3QtYS1zZWNyZXQtMDE="/>
+        <env name="SECRET_VAULT_LOCAL_PREVIOUS_KEKS" value=""/>
+        <env name="SECRET_VAULT_FINGERPRINT_KEY" value="dGVzdGluZy1maW5nZXJwcmludC1rZXktMDAwMDAwMDE="/>
+        <env name="AUDIT_HASH_KEY" value="dGVzdGluZy1hdWRpdC1oYXNoLWtleS0wMDAwMDAwMDE="/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
