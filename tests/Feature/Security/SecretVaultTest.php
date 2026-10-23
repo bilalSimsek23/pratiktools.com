@@ -49,7 +49,7 @@ final class SecretVaultTest extends TestCase
         $keyB = $this->inTenant($b, fn () => TenantDataKey::query()->first());
 
         $this->assertNotSame($keyA->wrapped_key, $keyB->wrapped_key);
-        $this->assertSame('test-v1', $keyA->kek_id);
+        $this->assertSame('local-test-v1', $keyA->kek_id);
 
         // Changing APP_KEY must not affect secrets.
         config(['app.key' => 'base64:'.base64_encode(random_bytes(32))]);
@@ -138,15 +138,15 @@ final class SecretVaultTest extends TestCase
 
         $old = config('platform.vault.local.key');
         $new = base64_encode(random_bytes(32));
-        config(['platform.vault.local' => ['key_id' => 'test-v2', 'key' => $new, 'previous' => "test-v1:{$old}"]]);
+        config(['platform.vault.local' => ['key_id' => 'local-test-v2', 'key' => $new, 'previous' => "local-test-v1:{$old}"]]);
         $this->app->forgetInstance(KeyEncryptionService::class);
         $this->app->forgetInstance(SecretVault::class);
 
         $this->assertSame(1, $this->inTenant($a, fn () => app(SecretVault::class)->rewrapDataKeys()));
-        $this->assertSame('test-v2', $this->inTenant($a, fn () => TenantDataKey::query()->value('kek_id')));
+        $this->assertSame('local-test-v2', $this->inTenant($a, fn () => TenantDataKey::query()->value('kek_id')));
 
         // The old KEK is no longer needed.
-        $this->app->instance(KeyEncryptionService::class, LocalKeyEncryptionService::fromConfig(['key_id' => 'test-v2', 'key' => $new]));
+        $this->app->instance(KeyEncryptionService::class, LocalKeyEncryptionService::fromConfig(['key_id' => 'local-test-v2', 'key' => $new]));
         $this->app->forgetInstance(SecretVault::class);
         $this->assertSame(self::SECRET, $this->inTenant($a, fn () => app(SecretVault::class)->reveal(TenantIntegration::query()->find($integration->id), 'test')->reveal()));
     }

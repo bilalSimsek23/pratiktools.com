@@ -56,7 +56,7 @@
         <env name="SESSION_SECURE_COOKIE" value="false"/>
         <!-- Test-only keys. Not secrets; never used outside the test suite. -->
         <env name="SECRET_VAULT_KEK_DRIVER" value="local"/>
-        <env name="SECRET_VAULT_LOCAL_KEK_ID" value="test-v1"/>
+        <env name="SECRET_VAULT_LOCAL_KEK_ID" value="local-test-v1"/>
         <env name="SECRET_VAULT_LOCAL_KEK" value="dGVzdGluZy1vbmx5LWtlay1ub3QtYS1zZWNyZXQtMDE="/>
         <env name="SECRET_VAULT_LOCAL_PREVIOUS_KEKS" value=""/>
         <env name="SECRET_VAULT_FINGERPRINT_KEY" value="dGVzdGluZy1maW5nZXJwcmludC1rZXktMDAwMDAwMDE="/>

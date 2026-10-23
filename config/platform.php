@@ -46,8 +46,8 @@ return [
     */
 
     'vault' => [
-        // local (development and tests only) or aws_kms. Production refuses
-        // to boot with anything but a real KMS driver.
+        // cloud_secret (production default), aws_kms (optional) or local
+        // (development and tests only; refused in production).
         'kek_driver' => env('SECRET_VAULT_KEK_DRIVER', 'local'),
 
         // Staging only: allows the local KEK there. Ignored in production.
@@ -61,7 +61,15 @@ return [
             'previous' => env('SECRET_VAULT_LOCAL_PREVIOUS_KEKS', ''),
         ],
 
-        // Symmetric AWS KMS key (full key ARN, not an alias). Credentials
+        // Platform KEK from a Laravel Cloud Secret: base64 of 32 random bytes
+        // (php artisan vault:generate-kek). PREVIOUS only during a rotation:
+        // comma-separated base64 keys, at most 3.
+        'cloud_secret' => [
+            'key' => env('SECRET_VAULT_KEK'),
+            'previous' => env('SECRET_VAULT_KEK_PREVIOUS', ''),
+        ],
+
+        // Optional: symmetric AWS KMS key (full key ARN, not an alias). Credentials
         // belong to an IAM user allowed only kms:Encrypt and kms:Decrypt on
         // this key.
         'aws_kms' => [

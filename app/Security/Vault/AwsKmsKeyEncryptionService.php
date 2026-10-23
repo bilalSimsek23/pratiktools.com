@@ -82,6 +82,11 @@ final class AwsKmsKeyEncryptionService implements KeyEncryptionService
         return $this->keyArn;
     }
 
+    public function knows(string $kekId): bool
+    {
+        return $kekId === $this->keyArn;
+    }
+
     public function wrap(#[\SensitiveParameter] string $dataKey, string $context): string
     {
         $result = $this->call(fn () => $this->client->encrypt([

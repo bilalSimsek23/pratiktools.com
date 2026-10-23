@@ -51,7 +51,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(CommerceSourceFactory::class);
         $this->app->singleton(ContactNormalizer::class, fn () => new ContactNormalizer(config('commerce.marketplace_email_domains')));
 
-        $this->app->singleton(KeyEncryptionService::class, fn () => KeyEncryptionServiceFactory::make(config('platform.vault')));
+        $this->app->singleton(KeyEncryptionService::class, fn () => KeyEncryptionServiceFactory::make(config('platform.vault'), $this->app->isProduction()));
     }
 
     public function boot(): void

@@ -3,92 +3,89 @@
 namespace App\Security\Vault;
 
 use App\Security\Vault\Contracts\KeyEncryptionService;
-use App\Security\Vault\Exceptions\DecryptionFailed;
 use App\Security\Vault\Exceptions\VaultException;
 
 /**
- * Development and test KEK provider. The KEK comes from the environment
- * (SECRET_VAULT_LOCAL_KEK), never from APP_KEY. Refused in production
- * unless explicitly allowed.
+ * Development and test KEK provider (SECRET_VAULT_LOCAL_KEK, never
+ * APP_KEY). Same primitive as cloud_secret; ids carry the "local-" prefix
+ * and are refused in production.
+ *
+ * Ids are derived from the key unless SECRET_VAULT_LOCAL_KEK_ID names one
+ * (kept for data keys created before derived ids existed); explicit ids
+ * must start with "local-".
  */
 final class LocalKeyEncryptionService implements KeyEncryptionService
 {
-    /**
-     * @param  array<string, string>  $keys  key id => raw 32-byte key
-     */
-    public function __construct(
-        private readonly string $currentKeyId,
-        private readonly array $keys,
-    ) {
-        if (! isset($keys[$currentKeyId])) {
-            throw new VaultException('The local KEK is not configured. Run `php artisan vault:generate-local-keys`.');
-        }
-    }
+    public const PREFIX = 'local-';
+
+    /** @var array<string, string> legacy explicit id => derived id */
+    private array $aliases = [];
+
+    private function __construct(private readonly SymmetricKeyring $keyring) {}
 
     /**
-     * @param  array{key_id?: string, key?: ?string, previous?: ?string}  $config
+     * @param  array{key_id?: ?string, key?: ?string, previous?: ?string}  $config
      */
     public static function fromConfig(array $config): self
     {
-        $keys = [];
-        $currentId = (string) ($config['key_id'] ?? 'local-v1');
-
-        if (! empty($config['key'])) {
-            $keys[$currentId] = self::decodeKey((string) $config['key']);
+        if (empty($config['key'])) {
+            throw new VaultException('The local KEK is not configured. Run `php artisan vault:generate-local-keys`.');
         }
 
-        foreach (array_filter(explode(',', (string) ($config['previous'] ?? ''))) as $pair) {
-            [$id, $encoded] = array_pad(explode(':', trim($pair), 2), 2, '');
-            if ($id !== '' && $encoded !== '') {
-                $keys[$id] = self::decodeKey($encoded);
+        $current = SymmetricKeyring::decode((string) $config['key'], 'SECRET_VAULT_LOCAL_KEK');
+        $previous = [];
+        $aliases = [];
+        if (! empty($config['key_id'])) {
+            $aliases[self::checkId((string) $config['key_id'])] = $current;
+        }
+
+        foreach (array_filter(array_map(trim(...), explode(',', (string) ($config['previous'] ?? '')))) as $entry) {
+            [$id, $encoded] = str_contains($entry, ':') ? explode(':', $entry, 2) : [null, $entry];
+            $raw = SymmetricKeyring::decode($encoded, 'SECRET_VAULT_LOCAL_PREVIOUS_KEKS entry');
+            $previous[] = $raw;
+            if ($id !== null && $id !== '') {
+                $aliases[self::checkId($id)] = $raw;
             }
         }
 
-        return new self($currentId, $keys);
+        $service = new self(new SymmetricKeyring(self::PREFIX, $current, $previous));
+        foreach ($aliases as $alias => $raw) {
+            $service->aliases[$alias] = SymmetricKeyring::deriveId(self::PREFIX, $raw);
+        }
+
+        return $service;
     }
 
+    /**
+     * New data keys record the explicit id when one is configured, so
+     * existing development data stays readable.
+     */
     public function currentKeyId(): string
     {
-        return $this->currentKeyId;
+        return array_search($this->keyring->currentKeyId(), $this->aliases, true) ?: $this->keyring->currentKeyId();
+    }
+
+    public function knows(string $kekId): bool
+    {
+        return $this->keyring->knows($this->aliases[$kekId] ?? $kekId);
     }
 
     public function wrap(#[\SensitiveParameter] string $dataKey, string $context): string
     {
-        $box = Aes256Gcm::encrypt($this->keys[$this->currentKeyId], $dataKey, $context);
-
-        return base64_encode(json_encode([
-            'n' => base64_encode($box['nonce']),
-            'c' => base64_encode($box['ciphertext']),
-            't' => base64_encode($box['tag']),
-        ], JSON_THROW_ON_ERROR));
+        return $this->keyring->wrap($dataKey, $context);
     }
 
     public function unwrap(string $wrappedKey, string $keyId, string $context): string
     {
-        $kek = $this->keys[$keyId] ?? throw new VaultException("KEK [{$keyId}] is not available.");
-
-        $box = json_decode((string) base64_decode($wrappedKey, true), true);
-        if (! is_array($box) || ! isset($box['n'], $box['c'], $box['t'])) {
-            throw new DecryptionFailed;
-        }
-
-        return Aes256Gcm::decrypt(
-            $kek,
-            (string) base64_decode($box['n'], true),
-            (string) base64_decode($box['c'], true),
-            (string) base64_decode($box['t'], true),
-            $context,
-        );
+        return $this->keyring->unwrap($wrappedKey, $this->aliases[$keyId] ?? $keyId, $context);
     }
 
-    private static function decodeKey(string $encoded): string
+    private static function checkId(string $id): string
     {
-        $raw = base64_decode($encoded, true);
-
-        if ($raw === false || strlen($raw) !== 32) {
-            throw new VaultException('Local KEK must be 32 bytes, base64 encoded.');
+        if (! str_starts_with($id, self::PREFIX)) {
+            throw new VaultException('Local KEK ids must start with "local-".');
         }
 
-        return $raw;
+        return $id;
     }
 }

@@ -77,7 +77,7 @@ final class AwsKmsKeyEncryptionServiceTest extends TestCase
     public static function implementations(): array
     {
         return [
-            'local' => [fn () => LocalKeyEncryptionService::fromConfig(['key_id' => 'k1', 'key' => base64_encode(random_bytes(32))])],
+            'local' => [fn () => LocalKeyEncryptionService::fromConfig(['key_id' => 'local-k1', 'key' => base64_encode(random_bytes(32))])],
             'aws_kms' => [fn (self $test) => $test->kms()],
         ];
     }
