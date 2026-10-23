@@ -8,6 +8,7 @@ use App\RateLimiting\ProviderRateLimiter;
 use Closure;
 use Illuminate\Support\Facades\Log;
 use LogicException;
+use SoapFault;
 use Throwable;
 
 /**
@@ -28,6 +29,14 @@ final class TicimaxClient
         'CustomServis' => ['SelectMailList'],
         'SiparisServis' => ['SelectSiparis', 'SelectSepet', 'SelectSiparisDurumlari'],
         'UrunServis' => ['SelectUrun', 'SelectUrunCount', 'SelectKategori'],
+    ];
+
+    /**
+     * Faults that only mean "no records": Ticimax answers an empty order
+     * page with a SOAP fault instead of an empty list.
+     */
+    private const EMPTY_RESULT_FAULTS = [
+        'SelectSiparis' => 'siparişler bulunamadı',
     ];
 
     private int $apiCalls = 0;
@@ -82,6 +91,12 @@ final class TicimaxClient
 
                 return $result;
             } catch (Throwable $e) {
+                if ($e instanceof SoapFault && isset(self::EMPTY_RESULT_FAULTS[$operation]) && str_contains(mb_strtolower($e->getMessage()), self::EMPTY_RESULT_FAULTS[$operation])) {
+                    $this->log($operation, $attempt, $started, 'empty');
+
+                    return [];
+                }
+
                 $error = TicimaxErrorClassifier::classify($e, $operation);
                 $this->log($operation, $attempt, $started, $error->category);
 

@@ -178,6 +178,32 @@ final class TicimaxConnectorTest extends TestCase
         $this->assertSame(1000.0, $records[1]->netTotal);
     }
 
+    public function test_orders_page_by_page_number_and_an_empty_page_fault_ends_the_window(): void
+    {
+        $store = $this->store($this->tenant);
+        $store->orders = array_map(fn ($i) => FakeTicimax::order($i, 0, null, [FakeTicimax::orderItem($i * 10, 5, 50)]), range(1, 4));
+        $window = SyncWindow::full(CarbonImmutable::now()->subYear(), CarbonImmutable::now());
+        $connector = $this->connector();
+
+        $first = $connector->orders($window);
+        $second = $connector->orders($window, $first->nextPageToken);
+        $third = $connector->orders($window, $second->nextPageToken);
+
+        $this->assertSame(['1', '2'], array_map(fn ($o) => $o->externalId, $first->records));
+        $this->assertSame(['3', '4'], array_map(fn ($o) => $o->externalId, $second->records));
+        $this->assertSame([], $third->records);
+        $this->assertNull($third->nextPageToken);
+        $this->assertSame([0, 1, 2], array_map(fn ($c) => $c['parameters']['s']['BaslangicIndex'], $store->calls));
+    }
+
+    public function test_an_order_window_without_orders_is_empty_not_an_error(): void
+    {
+        $page = $this->connector()->orders(SyncWindow::delta(CarbonImmutable::now()->subHour(), CarbonImmutable::now()));
+
+        $this->assertSame([], $page->records);
+        $this->assertNull($page->nextPageToken);
+    }
+
     public function test_factory_refuses_an_integration_of_another_tenant(): void
     {
         [$other] = $this->createTenant('other');

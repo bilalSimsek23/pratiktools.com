@@ -30,6 +30,9 @@ use Carbon\CarbonImmutable;
  *   update date.
  * - SelectSepet pages by page number (sayfaSayisi) with 100 carts per page
  *   and identifies carts by GuidSepetID (ID is 0).
+ * - SelectSiparis pages by zero-based page number and answers an empty
+ *   page with a fault ("... siparişler bulunamadı."), which the client
+ *   turns into an empty result.
  */
 final class TicimaxCommerceConnector implements CommerceSource, LooksUpRecords
 {
@@ -174,9 +177,12 @@ final class TicimaxCommerceConnector implements CommerceSource, LooksUpRecords
             ? ['SiparisTarihiBas' => R::filterDate($window->from ?? CarbonImmutable::create(2010), $this->tz()), 'SiparisTarihiSon' => R::filterDate($window->to, $this->tz())]
             : ['DuzenlemeTarihiBas' => R::filterDate($window->from ?? $window->to->subDay(), $this->tz()), 'DuzenlemeTarihiSon' => R::filterDate($window->to, $this->tz())]);
 
+        // Unlike SelectUrun, SelectSiparis treats BaslangicIndex as a
+        // zero-based page number (verified live: index 1 with 50 per page
+        // returns records 51-100).
         $result = $this->client->call('SiparisServis', 'SelectSiparis', [
             'f' => $filter,
-            's' => ['BaslangicIndex' => ($page - 1) * $this->orderPageSize, 'KayitSayisi' => $this->orderPageSize, 'SiralamaDegeri' => 'ID', 'SiralamaYonu' => 'Asc'],
+            's' => ['BaslangicIndex' => $page - 1, 'KayitSayisi' => $this->orderPageSize, 'SiralamaDegeri' => 'ID', 'SiralamaYonu' => 'Asc'],
         ]);
         $rows = R::list($result['SelectSiparisResult'] ?? null, 'WebSiparis');
 

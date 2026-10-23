@@ -97,17 +97,32 @@ final class FakeTicimax implements SoapTransport
                 $parameters['s']['BaslangicIndex'],
                 $parameters['s']['KayitSayisi'],
             ), 'UrunKarti') : []],
-            'SelectSiparis' => ['SelectSiparisResult' => $authorized ? $this->wrap($this->page(
-                $this->filterById($this->orders, $parameters['f']['SiparisID'] ?? -1),
-                $parameters['s']['BaslangicIndex'],
-                $parameters['s']['KayitSayisi'],
-            ), 'WebSiparis') : []],
+            'SelectSiparis' => ['SelectSiparisResult' => $authorized ? $this->wrap($this->orderPage($parameters), 'WebSiparis') : []],
             'SelectSepet' => ['SelectSepetResult' => $authorized ? [
                 'Sepetler' => $this->wrap($this->page($this->carts, ($parameters['sayfaSayisi'] - 1) * $this->cartPageSize, $this->cartPageSize), 'WebSepet'),
                 'Next' => count($this->carts) > $parameters['sayfaSayisi'] * $this->cartPageSize,
             ] : ['Sepetler' => [], 'Next' => false]],
             default => throw new \LogicException("FakeTicimax does not implement {$operation}."),
         };
+    }
+
+    /**
+     * Like Ticimax: BaslangicIndex is a zero-based page number, and an
+     * empty page is a SOAP fault, not an empty list.
+     *
+     * @param  array<string, mixed>  $parameters
+     * @return list<array<string, mixed>>
+     */
+    private function orderPage(array $parameters): array
+    {
+        $size = $parameters['s']['KayitSayisi'];
+        $rows = $this->page($this->filterById($this->orders, $parameters['f']['SiparisID'] ?? -1), $parameters['s']['BaslangicIndex'] * $size, $size);
+
+        if ($rows === []) {
+            throw new \SoapFault('a:InternalServiceFault', 'Tedarikçiye bağlı siparişler bulunamadı.');
+        }
+
+        return $rows;
     }
 
     /**
