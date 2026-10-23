@@ -45,7 +45,7 @@ final class SecretRedactionTest extends TestCase
             $this->assertStringNotContainsString('"c":', $body);
         }
 
-        $this->assertSame(['id', 'provider', 'capability', 'status', 'has_secret', 'secret_fingerprint', 'scopes', 'last_verified_at', 'last_error', 'updated_at'], array_keys($shown->json('data')));
+        $this->assertSame(['id', 'provider', 'capability', 'status', 'has_secret', 'secret_fingerprint', 'scopes', 'settings', 'last_verified_at', 'last_error', 'updated_at'], array_keys($shown->json('data')));
     }
 
     public function test_logs_never_contain_secrets_or_personal_data(): void
