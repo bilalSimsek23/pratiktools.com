@@ -25,5 +25,8 @@ final readonly class ProductRecord
         public ?CarbonImmutable $createdAt,
         public array $variants,
         public array $attributes = [],
+        // False when the source returned the card without its variants
+        // (Ticimax stock-date queries do); variants must then be left alone.
+        public bool $variantsIncluded = true,
     ) {}
 }

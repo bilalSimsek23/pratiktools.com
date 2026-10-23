@@ -81,8 +81,19 @@ final class CatalogUpserter
 
         DB::transaction(function () use ($records, $stored, $tenantId, $result) {
             foreach ($records as $p) {
-                $hash = $this->productHash($p);
                 $existing = $stored[$p->externalId] ?? null;
+
+                if (! $p->variantsIncluded && $existing !== null) {
+                    // Card without variants: refresh the card fields only and
+                    // keep the hash, so the next complete card is compared
+                    // against what was really stored.
+                    $this->updateCardFields($p, $existing->id, $tenantId);
+                    $result->updated++;
+
+                    continue;
+                }
+
+                $hash = $this->productHash($p);
 
                 if ($existing !== null && $existing->source_hash === $hash) {
                     $result->skipped++;
@@ -93,7 +104,9 @@ final class CatalogUpserter
                 $productId = $this->upsertProduct($p, $existing?->id, $hash, $tenantId);
                 $existing === null ? $result->inserted++ : $result->updated++;
 
-                $this->syncVariants($productId, $p->variants, $tenantId);
+                if ($p->variantsIncluded) {
+                    $this->syncVariants($productId, $p->variants, $tenantId);
+                }
                 $this->syncCategories($productId, $p, $tenantId);
             }
         });
@@ -125,6 +138,18 @@ final class CatalogUpserter
         DB::table('products')->insert($values + ['id' => $id, 'tenant_id' => $tenantId, 'external_id' => $p->externalId, 'created_at' => now()]);
 
         return $id;
+    }
+
+    private function updateCardFields(ProductRecord $p, string $id, string $tenantId): void
+    {
+        DB::table('products')->where('tenant_id', $tenantId)->where('id', $id)->update([
+            'name' => $p->name,
+            'brand' => $p->brand,
+            'is_active' => $p->isActive,
+            'total_stock' => $p->totalStock,
+            'url' => $p->url,
+            'updated_at' => now(),
+        ]);
     }
 
     /**

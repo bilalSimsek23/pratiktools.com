@@ -124,7 +124,7 @@ final class CustomerUpserter
 
         DB::update(
             'UPDATE customers SET email = ?, phone = ?, first_name = ?, last_name = ?, birth_date = ?, gender = ?, city = ?, district = ?, member_since = ?,
-                is_guest = false, is_active = ?, source_updated_at = ?, source_consent = source_consent || ?::jsonb, attributes = attributes || ?::jsonb, updated_at = now()
+                is_guest = false, is_active = ?, source_updated_at = ?, source_consent = source_consent || ?::jsonb, attributes = (attributes - \'member_pending\') || ?::jsonb, updated_at = now()
              WHERE id = ? AND tenant_id = ?',
             [
                 $fields['email'], $phone, $r->firstName, $r->lastName, $fields['birth_date'], $r->gender, $r->city, $r->district, $r->memberSince,

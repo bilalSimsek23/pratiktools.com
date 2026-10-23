@@ -150,12 +150,12 @@ final class CompareCommerceData extends Command
 
                 continue;
             }
-            $variants = DB::table('product_variants')->where('product_id', $p->id)->where('is_active', true)->get()->keyBy('external_id');
+            $variants = DB::table('product_variants')->where('product_id', $p->id)->get()->keyBy('external_id');
             $sourceVariants = collect($r->variants)->keyBy('externalId');
             $variantDiffs = 0;
             foreach ($sourceVariants as $id => $v) {
                 $s = $variants[$id] ?? null;
-                if ($s === null || (string) $s->sku !== (string) $v->sku || (float) $s->stock !== $v->stock || (float) $s->sale_price !== (float) $v->salePrice || $s->color !== $v->color || $s->size !== $v->size) {
+                if ($s === null || (bool) $s->is_active !== $v->isActive || (string) $s->sku !== (string) $v->sku || (float) $s->stock !== $v->stock || (float) $s->sale_price !== (float) $v->salePrice || $s->color !== $v->color || $s->size !== $v->size) {
                     $variantDiffs++;
                 }
             }
@@ -166,7 +166,7 @@ final class CompareCommerceData extends Command
                 'is_active' => [$p->is_active, $r->isActive],
                 'total_stock' => [(float) $p->total_stock, $r->totalStock],
                 'url' => [$p->url, $r->url],
-                'variant_count' => [$variants->count(), count(array_filter($r->variants, fn ($v) => $v->isActive)) + count(array_filter($r->variants, fn ($v) => ! $v->isActive && isset($variants[$v->externalId])))],
+                'active_variants' => [$variants->where('is_active', true)->count(), count(array_filter($r->variants, fn ($v) => $v->isActive))],
                 'variant_fields' => [0, $variantDiffs],
                 'categories' => [DB::table('product_categories')->where('product_id', $p->id)->count(), count(array_unique($r->categoryExternalIds))],
             ])];

@@ -137,6 +137,9 @@ final class TicimaxMapper
                 'color_code' => R::string($p['RenkKodu'] ?? null),
                 'published_at' => R::date($p['YayinTarihi'] ?? null, $this->timezone)?->toIso8601String(),
             ], fn ($v) => $v !== null),
+            // Every Ticimax card has at least one variant; an empty list
+            // means the query did not include them (stock-date filter).
+            variantsIncluded: $variants !== [],
         );
     }
 

@@ -87,6 +87,22 @@ final class CommerceSyncTest extends TestCase
         $this->inTenant($this->tenant, fn () => $this->assertFalse((bool) DB::table('product_variants')->where('external_id', '51')->value('is_active')));
     }
 
+    public function test_a_card_returned_without_variants_never_deactivates_them(): void
+    {
+        $this->sync($this->tenant, $this->integration, SyncEntity::Products);
+
+        // Ticimax stock-date queries return the card without Varyasyonlar.
+        $this->shop->products[0] = FakeTicimax::product(5, [], [1, 2], ['ToplamStokAdedi' => 3, 'Varyasyonlar' => []]);
+        $run = $this->sync($this->tenant, $this->integration, SyncEntity::Products, SyncMode::Delta);
+
+        $this->assertSame('succeeded', $run->status);
+        $this->inTenant($this->tenant, function () {
+            $this->assertSame(2, DB::table('product_variants')->where('external_id', 'like', '5%')->where('is_active', true)->count());
+            $this->assertEquals(3, (float) DB::table('products')->where('external_id', '5')->value('total_stock'));
+            $this->assertSame(2, DB::table('product_categories')->join('products', 'products.id', '=', 'product_categories.product_id')->where('products.external_id', '5')->count());
+        });
+    }
+
     public function test_duplicate_member_id_across_pages_creates_one_customer(): void
     {
         $this->shop->members = [
@@ -264,6 +280,23 @@ final class CommerceSyncTest extends TestCase
             $this->assertSame(1, DB::table('carts')->count());
             $this->assertNull(DB::table('carts')->value('customer_id'));
             $this->assertSame(0, DB::table('customers')->count());
+        });
+    }
+
+    public function test_order_of_an_unsynced_member_creates_a_stub_that_the_member_sync_completes(): void
+    {
+        $this->shop->orders = [FakeTicimax::order(40, 77, 'new@example.com', [FakeTicimax::orderItem(400, 5, 50)])];
+        $this->sync($this->tenant, $this->integration, SyncEntity::Orders);
+
+        $this->shop->members = [FakeTicimax::member(77, 'new@example.com')];
+        $this->sync($this->tenant, $this->integration, SyncEntity::Customers);
+
+        $this->inTenant($this->tenant, function () {
+            $this->assertSame(1, DB::table('customers')->count());
+            $customer = DB::table('customers')->first();
+            $this->assertSame('Ad77', $customer->first_name);
+            $this->assertArrayNotHasKey('member_pending', json_decode($customer->attributes, true));
+            $this->assertSame($customer->id, DB::table('orders')->value('customer_id'));
         });
     }
 
