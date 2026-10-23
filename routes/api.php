@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\IntegrationController;
+use App\Http\Controllers\Api\V1\IntegrationSyncController;
 use App\Http\Controllers\Api\V1\MemberController;
 use App\Http\Controllers\Api\V1\TenantController;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +32,10 @@ Route::prefix('v1')->group(function () {
         Route::put('integrations/{integration}/secret', [IntegrationController::class, 'updateSecret']);
         Route::post('integrations/{integration}/verify', [IntegrationController::class, 'verify']);
         Route::delete('integrations/{integration}', [IntegrationController::class, 'destroy']);
+        Route::post('integrations/{integration}/test', [IntegrationSyncController::class, 'test'])->middleware('throttle:6,1');
+        Route::get('integrations/{integration}/sync-status', [IntegrationSyncController::class, 'status']);
+        Route::post('integrations/{integration}/sync', [IntegrationSyncController::class, 'sync'])->middleware('throttle:6,1');
+        Route::get('integrations/{integration}/preview', [IntegrationSyncController::class, 'preview']);
 
         Route::get('customers', [CustomerController::class, 'index']);
         Route::get('customers/{customer}', [CustomerController::class, 'show']);

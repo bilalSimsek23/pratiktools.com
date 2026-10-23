@@ -9,6 +9,7 @@ use App\Http\Resources\IntegrationResource;
 use App\Integrations\ProviderRegistry;
 use App\Jobs\VerifyIntegration;
 use App\Models\TenantIntegration;
+use App\Security\OutboundUrlGuard;
 use App\Security\Vault\SecretVault;
 use App\Tenancy\Permission;
 use App\Tenancy\TenantContext;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 /**
  * Integration secrets are write-only: they are accepted on create and on
@@ -31,6 +33,7 @@ final class IntegrationController extends Controller
         private readonly ProviderRegistry $providers,
         private readonly TenantContext $context,
         private readonly AuditLogger $audit,
+        private readonly OutboundUrlGuard $urlGuard,
     ) {}
 
     public function index(): AnonymousResourceCollection
@@ -57,21 +60,27 @@ final class IntegrationController extends Controller
             'secret' => ['required', 'string', 'min:8', 'max:8192'],
             'scopes' => ['sometimes', 'array', 'max:50'],
             'scopes.*' => ['string', 'max:100'],
+            'settings' => ['sometimes', 'array'],
+            'settings.service_url' => ['sometimes', 'string', 'url:https', 'max:255'],
+            'settings.storefront_url' => ['sometimes', 'string', 'url:https', 'max:255'],
         ]);
 
         if (! $this->providers->supports($data['provider'], $data['capability'])) {
             throw ValidationException::withMessages(['capability' => 'The provider does not support this capability.']);
         }
 
+        $settings = $this->settings($data);
+
         if (TenantIntegration::query()->where('provider', $data['provider'])->where('capability', $data['capability'])->exists()) {
             throw ValidationException::withMessages(['provider' => 'This integration already exists; rotate its secret instead.']);
         }
 
-        $integration = DB::transaction(function () use ($data) {
+        $integration = DB::transaction(function () use ($data, $settings) {
             $integration = new TenantIntegration([
                 'provider' => $data['provider'],
                 'capability' => $data['capability'],
                 'scopes' => $data['scopes'] ?? [],
+                'settings' => $settings,
                 'status' => 'pending',
             ]);
             $integration->tenant_id = $this->context->requireTenant();
@@ -134,5 +143,32 @@ final class IntegrationController extends Controller
         });
 
         return response()->json(status: 204);
+    }
+
+    /**
+     * Provider settings are an allowlist; Ticimax commerce needs both URLs,
+     * and both must pass the outbound URL guard (https, public host).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, string>
+     */
+    private function settings(array $data): array
+    {
+        if ($data['provider'] !== 'ticimax' || $data['capability'] !== 'commerce') {
+            return [];
+        }
+
+        $settings = [];
+        foreach (['service_url', 'storefront_url'] as $key) {
+            $url = (string) ($data['settings'][$key] ?? '');
+            try {
+                $this->urlGuard->assertSafe($url);
+            } catch (InvalidArgumentException $e) {
+                throw ValidationException::withMessages(["settings.{$key}" => $e->getMessage()]);
+            }
+            $settings[$key] = $key === 'service_url' ? rtrim($url, '/').'/' : rtrim($url, '/');
+        }
+
+        return $settings;
     }
 }

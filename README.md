@@ -3,8 +3,9 @@
 Multi-tenant marketing automation platform for Ticimax stores. This repository
 is independent of the IGS admin application; IGS is the first tenant.
 
-Current phase: **F0 – platform foundation** (tenancy, row-level security,
-secret vault, audit log, queues, health, CI). No provider connectors yet.
+Current phase: **F1 – Ticimax connector and read-only commerce sync** on top of
+the F0 platform foundation (tenancy, row-level security, secret vault, audit
+log, queues, health, CI). Nothing is ever written to Ticimax.
 
 ## Architecture in one page
 
@@ -21,6 +22,31 @@ secret vault, audit log, queues, health, CI). No provider connectors yet.
 | Webhooks | `POST /webhooks/{provider}/{tenantPublicId}` stores into `webhook_inbox` (idempotent on `external_event_id`), then processes on the `webhooks` queue. |
 | Super Admin | Separate host (`ADMIN_DOMAIN`), separate guard, mandatory TOTP 2FA, aggregate data only. Horizon is only reachable there. |
 | Observability | JSON logs with `tenant_id`, `request_id`, `job_id`, `provider`, `run_id`, `error_class`; e-mails, phone numbers and secrets are redacted. `/healthz` (liveness), `/health` (database, Redis, Horizon, queue backlog). `ErrorReporter` / `Tracer` interfaces for Sentry/OpenTelemetry. |
+
+## Commerce sync (F1)
+
+| Concern | How |
+| --- | --- |
+| Provider boundary | `App\Commerce\Contracts\CommerceSource` (read-only, paged, opaque page tokens). `TicimaxCommerceConnector` is the first implementation; `CommerceSourceFactory` builds it from the tenant integration (settings: `service_url`, `storefront_url`; secret: the Ticimax member code, in the vault). |
+| Ticimax client | Read-only operation allowlist, tenant token bucket, retry with exponential backoff and jitter, normalized errors (`auth`, `rate_limited`, `retryable`, `permanent`, `schema_mismatch`), WSDL cache, request id header, no SOAP trace in production, no parameters or bodies in logs. |
+| Canonical data | `customers` + `customer_identities` (member id, e-mail, phone, newsletter id; deterministic matching only, conflicts go to `customer_merges` for review), `customer_stats`, `categories`, `products`, `product_variants`, `orders`, `order_items`, `carts`, `cart_items`. Ticimax permission flags are kept as source data (`source_consent`) only. |
+| Marketplace orders | Stored and flagged (`is_marketplace`, `channel = marketplace`); never create a customer or identity and are excluded from customer stats. |
+| Events | `customer_events`: `CUSTOMER_CREATED/UPDATED`, `ORDER_PLACED`, `ORDER_STATUS_CHANGED`, `CART_UPDATED`, versioned, unique per `(source, source_event_id)`. Events derived from history are `is_backfill`. No `CART_ABANDONED` (automation engine, F5). |
+| Sync | `SyncRunner`: one window per run (full: backfill start; delta: cursor minus overlap), progress saved after every page, cursor advanced only after the whole window and never backwards. `SyncCommerceEntity` jobs on the `sync` queue work in 45 s slices and re-queue themselves. Scheduler entries exist but are off unless `COMMERCE_SYNC_SCHEDULE_ENABLED=true`. |
+| Health and errors | `integration_sync_runs`, `integration_sync_cursors`, `integration_errors`; integration status `connected` / `syncing` / `error` / `action_required`. |
+
+```sh
+# secret from STDIN only (never as an argument)
+printf '%s' "$TICIMAX_MEMBER_CODE" | php artisan ticimax:connect --tenant=demo \
+    --service-url=https://www.example.com/Servis/ --storefront-url=https://www.example.com --secret-stdin
+php artisan commerce:test --tenant=demo
+php artisan commerce:sync --tenant=demo --entity=all --mode=full --inline
+php artisan commerce:status --tenant=demo
+php artisan commerce:preview --tenant=demo      # 10 records each, contact data masked
+php artisan commerce:compare --tenant=demo      # counts and field-by-field check against the source
+```
+
+API: `POST /api/v1/integrations/{id}/test`, `GET …/sync-status`, `POST …/sync`, `GET …/preview`.
 
 Static egress IP: provider allowlists (IYS, optionally OneSignal) require all
 outbound calls to leave through fixed IPs. Deploy workers behind a NAT gateway

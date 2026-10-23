@@ -27,6 +27,7 @@ final class IntegrationResource extends JsonResource
             'has_secret' => $this->hasSecret(),
             'secret_fingerprint' => $this->secret_fingerprint,
             'scopes' => $this->scopes,
+            'settings' => $this->settings,
             'last_verified_at' => $this->last_verified_at?->toIso8601String(),
             'last_error' => $this->last_error,
             'updated_at' => $this->updated_at?->toIso8601String(),
