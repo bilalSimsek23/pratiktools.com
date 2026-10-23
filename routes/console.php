@@ -12,15 +12,20 @@ use Illuminate\Support\Facades\Schedule;
 | The scheduler never enters a tenant context itself. Platform jobs run in
 | the system context; tenant work is fanned out as one job per tenant, each
 | carrying its own tenant_id.
+|
+| Every entry runs on one server (a cache lock in Redis) and never
+| overlaps itself, so several App/Worker replicas with the scheduler
+| enabled cannot dispatch the same work twice.
 */
 
-Schedule::job(new PlatformHeartbeat)->everyMinute()->name('platform-heartbeat')->withoutOverlapping();
+Schedule::job(new PlatformHeartbeat)->everyMinute()->name('platform-heartbeat')->onOneServer()->withoutOverlapping();
 
-Schedule::command('horizon:snapshot')->everyFiveMinutes();
+Schedule::command('horizon:snapshot')->everyFiveMinutes()->onOneServer()->withoutOverlapping();
 
 Schedule::call(fn () => app(TenantFanout::class)->dispatch(fn (string $tenantId) => new RecordTenantIntegrationHealth($tenantId)))
     ->hourly()
     ->name('tenant-integration-health')
+    ->onOneServer()
     ->withoutOverlapping();
 
 /*
@@ -32,6 +37,7 @@ if (config('commerce.schedule.enabled')) {
         Schedule::call(fn () => app(TenantFanout::class)->dispatch(fn (string $tenantId) => new ScheduleCommerceSync([$entity => SyncMode::Delta], tenantId: $tenantId)))
             ->cron($cron)
             ->name("commerce-sync-{$entity}")
+            ->onOneServer()
             ->withoutOverlapping();
     }
 
@@ -45,6 +51,7 @@ if (config('commerce.schedule.enabled')) {
     )))
         ->cron(config('commerce.schedule.reconciliation'))
         ->name('commerce-reconciliation')
+        ->onOneServer()
         ->withoutOverlapping();
 }
 
@@ -57,6 +64,7 @@ if (config('consent.schedule.enabled')) {
         Schedule::call(fn () => app(TenantFanout::class)->dispatch(fn (string $tenantId) => new ScheduleConsentSync($kind, $tenantId)))
             ->cron(config("consent.schedule.{$key}"))
             ->name("consent-sync-{$kind}")
+            ->onOneServer()
             ->withoutOverlapping();
     }
 }
