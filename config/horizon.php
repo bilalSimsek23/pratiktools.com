@@ -225,15 +225,20 @@ return [
             'maxJobs' => 1000,
             'memory' => 256,
             'tries' => 3,
+            // Default for jobs without their own timeout; < retry_after (960).
             'timeout' => 300,
             'nice' => 0,
         ],
     ],
 
     'environments' => [
+        // IGS pilot sizing: a handful of tenants, webhooks and syncs only;
+        // automation and send are idle until F5+. About 5 PHP processes in
+        // total fit a 1-2 GB worker instance and keep the Postgres
+        // connection count small. Raise maxProcesses when queues back up.
         'production' => [
-            'supervisor-platform' => ['maxProcesses' => 4, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
-            'supervisor-work' => ['maxProcesses' => 10, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
+            'supervisor-platform' => ['minProcesses' => 1, 'maxProcesses' => 2, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
+            'supervisor-work' => ['minProcesses' => 1, 'maxProcesses' => 3, 'balanceMaxShift' => 1, 'balanceCooldown' => 3],
         ],
 
         'staging' => [

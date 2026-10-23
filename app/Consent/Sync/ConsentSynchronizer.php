@@ -172,8 +172,9 @@ final class ConsentSynchronizer
     /**
      * Ticimax permission history in monthly windows (no paging exists).
      */
-    public function ticimaxHistory(TenantIntegration $commerce, ?CarbonImmutable $from = null, ?Actor $actor = null): IntegrationSyncRun
+    public function ticimaxHistory(TenantIntegration $commerce, ?CarbonImmutable $from = null, ?Actor $actor = null, ?float $sliceSeconds = null): IntegrationSyncRun
     {
+        $started = microtime(true);
         $cursor = $this->tracker->cursor($commerce, self::ENTITY_TICIMAX_HISTORY);
         $start = $from ?? ($cursor?->last_window_end ? CarbonImmutable::parse($cursor->last_window_end)->subHour() : CarbonImmutable::parse((string) config('consent.ticimax.history_start', '2019-01-01')));
         $end = CarbonImmutable::now()->subMinutes(2);
@@ -192,6 +193,12 @@ final class ConsentSynchronizer
                 $stored = $this->observeStoreChanges($changes);
                 $this->tracker->progress($run, ['read' => count($changes), 'updated' => $stored, 'skipped' => count($changes) - $stored, 'api_calls' => 1], $windowTo->toIso8601String());
                 $windowFrom = $windowTo;
+
+                if ($sliceSeconds !== null && $windowFrom->lt($end) && microtime(true) - $started >= $sliceSeconds) {
+                    $run->forceFill(['slices' => $run->slices + 1])->save();
+
+                    return $run;
+                }
             }
 
             return $this->tracker->succeed($run, $commerce);
@@ -340,10 +347,13 @@ final class ConsentSynchronizer
      * budget (1,000 per hour per IP, shared by all tenants). Addresses the
      * store marks as consenting and newsletter subscribers go first.
      */
-    public function iysResolve(TenantIntegration $iys, ?int $budget = null, ?Actor $actor = null): IntegrationSyncRun
+    public function iysResolve(TenantIntegration $iys, ?int $budget = null, ?Actor $actor = null, ?float $sliceSeconds = null): IntegrationSyncRun
     {
         $budget ??= (int) config('consent.iys.resolve_budget_per_run');
         $run = $this->tracker->open($iys, self::ENTITY_IYS_RESOLVE);
+        $started = microtime(true);
+        // A sliced run continues where it stopped; the budget covers the run.
+        $budget = max(0, $budget - $run->records_read);
 
         try {
             $provider = $this->consentProviders->for($iys, 'consent_status_resolve', $actor ?? Actor::job(self::class));
@@ -360,6 +370,12 @@ final class ConsentSynchronizer
             );
 
             foreach ($candidates as $c) {
+                if ($sliceSeconds !== null && microtime(true) - $started >= $sliceSeconds) {
+                    $run->forceFill(['slices' => $run->slices + 1])->save();
+
+                    return $run;
+                }
+
                 try {
                     $result = $provider->queryConsent($c->address, ConsentChannel::Email, RecipientType::Individual);
                 } catch (ProviderError $e) {

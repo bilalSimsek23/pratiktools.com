@@ -6,6 +6,7 @@ use App\Consent\Sync\ConsentSynchronizer;
 use App\Consent\Sync\SyncTracker;
 use App\Models\IntegrationSyncRun;
 use App\Models\TenantIntegration;
+use App\Queue\Middleware\SetTenantContext;
 use App\Queue\TenantAwareJob;
 use App\Tenancy\TenantContext;
 use Illuminate\Bus\Queueable;
@@ -13,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Throwable;
 
 /**
@@ -27,7 +29,12 @@ final class SyncConsent implements ShouldBeUniqueUntilProcessing, ShouldQueue
 
     public int $tries = 1;
 
-    public int $timeout = 900;
+    /**
+     * Every kind works in slices of commerce.sync.slice_seconds (plus one
+     * provider call), far below this; must stay under the queue's
+     * retry_after so a running job is never handed to a second worker.
+     */
+    public int $timeout = 600;
 
     public function __construct(
         public readonly string $integrationId,
@@ -53,17 +60,32 @@ final class SyncConsent implements ShouldBeUniqueUntilProcessing, ShouldQueue
             return;
         }
 
+        $slice = (float) config('commerce.sync.slice_seconds');
         $run = match ($this->kind) {
-            'iys_status' => $sync->iysStatus($integration, (float) config('commerce.sync.slice_seconds')),
+            'iys_status' => $sync->iysStatus($integration, $slice),
             'iys_changes' => tap($sync->iysChanges($integration, 'citizen'), fn () => $sync->iysChanges($integration, 'provider')),
-            'iys_resolve' => $sync->iysResolve($integration),
-            'ticimax_history' => $sync->ticimaxHistory($integration),
+            'iys_resolve' => $sync->iysResolve($integration, sliceSeconds: $slice),
+            'ticimax_history' => $sync->ticimaxHistory($integration, sliceSeconds: $slice),
             default => throw new \InvalidArgumentException("Unknown consent sync [{$this->kind}]."),
         };
 
         if ($run->status === 'running') {
-            self::dispatch($this->integrationId, $this->kind, $this->tenantId);
+            // Delayed so this job's overlap lock is released first.
+            self::dispatch($this->integrationId, $this->kind, $this->tenantId)->delay(now()->addSeconds(5));
         }
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [
+            new SetTenantContext,
+            // A duplicate delivery of the same sync never calls the provider
+            // twice: it is dropped while the first one holds the lock.
+            (new WithoutOverlapping("consent:{$this->uniqueId()}"))->dontRelease()->expireAfter($this->timeout + 60),
+        ];
     }
 
     public function failed(?Throwable $e): void

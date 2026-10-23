@@ -6,6 +6,7 @@ use App\Commerce\Sync\SyncEntity;
 use App\Commerce\Sync\SyncMode;
 use App\Commerce\Sync\SyncRunner;
 use App\Models\TenantIntegration;
+use App\Queue\Middleware\SetTenantContext;
 use App\Queue\TenantAwareJob;
 use App\Tenancy\TenantContext;
 use Illuminate\Bus\Queueable;
@@ -13,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Throwable;
 
 /**
@@ -26,7 +28,11 @@ final class SyncCommerceEntity implements ShouldBeUniqueUntilProcessing, ShouldQ
 
     public int $tries = 1;
 
-    public int $timeout = 600;
+    /**
+     * A slice works for commerce.sync.slice_seconds plus one page; this
+     * must stay under the queue's retry_after.
+     */
+    public int $timeout = 300;
 
     public function __construct(
         public readonly string $integrationId,
@@ -56,8 +62,22 @@ final class SyncCommerceEntity implements ShouldBeUniqueUntilProcessing, ShouldQ
         $run = $runner->run($integration, $this->entity, $this->mode, (float) config('commerce.sync.slice_seconds'), lookbackDays: $this->lookbackDays);
 
         if ($run->status === 'running') {
-            self::dispatch($this->integrationId, $this->entity, $this->mode, $this->tenantId, $this->lookbackDays);
+            // Delayed so this job's overlap lock is released first.
+            self::dispatch($this->integrationId, $this->entity, $this->mode, $this->tenantId, $this->lookbackDays)->delay(now()->addSeconds(5));
         }
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [
+            new SetTenantContext,
+            // A duplicate delivery never reads the same window twice at the
+            // provider: it is dropped while the first one holds the lock.
+            (new WithoutOverlapping("commerce:{$this->uniqueId()}"))->dontRelease()->expireAfter($this->timeout + 60),
+        ];
     }
 
     /**

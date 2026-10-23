@@ -68,8 +68,10 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'system'),
-            // Longer than the longest Horizon timeout (300s).
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 330),
+            // Must exceed every job timeout (longest: 900s) so a job that is
+            // still running is never handed to a second worker. Guarded by
+            // tests/Feature/Queue/QueueTimeoutTest.
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 960),
             'block_for' => null,
             // Jobs dispatched inside a transaction are pushed only after commit.
             'after_commit' => true,
