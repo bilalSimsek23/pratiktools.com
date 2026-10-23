@@ -86,9 +86,12 @@ return [
 
         // Runtime connection (HTTP, queue, scheduler). Uses the non-owner
         // saas_app role, so PostgreSQL row-level security always applies.
+        // Runtime connection: the RLS-bound app role. Deliberately not
+        // configurable from DB_URL / DATABASE_URL: Laravel Cloud injects the
+        // database administrator (BYPASSRLS) credential, which must never
+        // become the runtime role by accident.
         'pgsql' => [
             'driver' => 'pgsql',
-            'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'saas'),
@@ -102,6 +105,7 @@ return [
         ],
 
         // Schema owner. Only used by `php artisan migrate --database=pgsql_owner`.
+        // Migrations only (php artisan migrate --database=pgsql_owner).
         'pgsql_owner' => [
             'driver' => 'pgsql',
             'host' => env('DB_HOST', '127.0.0.1'),
@@ -117,6 +121,7 @@ return [
         ],
 
         // Super Admin panel. Column-level grants only, no tenant PII tables.
+        // Super Admin: column-level read grants, no tenant personal data.
         'pgsql_platform' => [
             'driver' => 'pgsql',
             'host' => env('DB_HOST', '127.0.0.1'),
@@ -193,8 +198,12 @@ return [
             'persistent' => env('REDIS_PERSISTENT', false),
         ],
 
+        // Laravel Cloud Valkey requires TLS: either REDIS_URL=rediss://...
+        // (parsed into scheme "tls") or REDIS_HOST/PORT/PASSWORD with
+        // REDIS_SCHEME=tls. Local Redis keeps plain tcp.
         'default' => [
             'url' => env('REDIS_URL'),
+            'scheme' => env('REDIS_SCHEME', 'tcp'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
@@ -208,6 +217,7 @@ return [
 
         'cache' => [
             'url' => env('REDIS_URL'),
+            'scheme' => env('REDIS_SCHEME', 'tcp'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),

@@ -19,7 +19,8 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'json'),
+    // Production defaults to stderr: Laravel Cloud's filesystem is ephemeral.
+    'default' => env('LOG_CHANNEL', env('APP_ENV') === 'production' ? 'json_stderr' : 'json'),
 
     /*
     |--------------------------------------------------------------------------
