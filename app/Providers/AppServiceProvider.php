@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Commerce\CommerceSourceFactory;
+use App\Commerce\Identity\ContactNormalizer;
 use App\Integrations\ProviderRegistry;
 use App\Logging\Redactor;
 use App\Models\PersonalAccessToken;
@@ -39,6 +41,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Redactor::class);
         $this->app->singleton(ErrorReporter::class, NullErrorReporter::class);
         $this->app->singleton(Tracer::class, NullTracer::class);
+        $this->app->singleton(CommerceSourceFactory::class);
+        $this->app->singleton(ContactNormalizer::class, fn () => new ContactNormalizer(config('commerce.marketplace_email_domains')));
 
         $this->app->singleton(KeyEncryptionService::class, function () {
             return match ($driver = config('platform.vault.kek_driver')) {

@@ -106,7 +106,13 @@ return [
     */
 
     'rate_limits' => [
-        'providers' => [],
+        'providers' => [
+            // Conservative: Ticimax publishes no limits; the store's own admin
+            // and storefront share the same backend.
+            'ticimax' => [
+                'tenant' => ['capacity' => 4, 'refill_per_second' => 2],
+            ],
+        ],
     ],
 
 ];
