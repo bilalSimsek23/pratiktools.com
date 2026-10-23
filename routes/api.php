@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\ConsentController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\IntegrationController;
 use App\Http\Controllers\Api\V1\IntegrationSyncController;
@@ -39,6 +40,11 @@ Route::prefix('v1')->group(function () {
 
         Route::get('customers', [CustomerController::class, 'index']);
         Route::get('customers/{customer}', [CustomerController::class, 'show']);
+
+        Route::get('consent/overview', [ConsentController::class, 'overview']);
+        Route::get('consent/reconciliation', [ConsentController::class, 'reconciliation']);
+        Route::get('consent/conflicts', [ConsentController::class, 'conflicts']);
+        Route::get('customers/{customer}/eligibility', [ConsentController::class, 'eligibility']);
 
         Route::get('audit-logs', [AuditLogController::class, 'index']);
     });
