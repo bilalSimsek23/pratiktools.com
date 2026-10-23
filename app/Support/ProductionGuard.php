@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Security\Vault\AwsKmsKeyEncryptionService;
+use App\Security\Vault\KekPolicy;
 use App\Security\Vault\KeyEncryptionServiceFactory;
 use Illuminate\Contracts\Config\Repository;
 use RuntimeException;
@@ -76,24 +77,39 @@ final class ProductionGuard
         $driver = (string) $config->get('platform.vault.kek_driver', '');
 
         if ($driver === '') {
-            return ['SECRET_VAULT_KEK_DRIVER is empty; configure a KMS driver'];
+            return ['SECRET_VAULT_KEK_DRIVER is empty; use cloud_secret'];
         }
         if (! in_array($driver, KeyEncryptionServiceFactory::implemented(), true)) {
             return ['SECRET_VAULT_KEK_DRIVER names a driver that is not implemented'];
         }
         if ($driver === 'local') {
             return $production || ! $config->get('platform.vault.allow_local_kek_in_staging')
-                ? ['the local KEK driver is not allowed; configure a KMS driver (aws_kms)']
+                ? ['the local KEK driver is not allowed; use cloud_secret']
                 : [];
         }
         if ($production && ! in_array($driver, KeyEncryptionServiceFactory::productionDrivers(), true)) {
             return ['SECRET_VAULT_KEK_DRIVER is not a production KMS driver'];
         }
 
-        // Per-driver settings checks; a new driver adds its own entry.
-        $settings = ['aws_kms' => fn () => self::awsKmsProblems((array) $config->get('platform.vault.aws_kms', []))];
+        $problems = [];
+        if ($driver === 'aws_kms' && ! KeyEncryptionServiceFactory::awsSdkInstalled()) {
+            $problems[] = 'the aws_kms driver needs aws/aws-sdk-php installed';
+        }
+        if ($driver === 'aws_kms' || ! empty($config->get('platform.vault.aws_kms.key_id'))) {
+            array_push($problems, ...self::awsKmsProblems((array) $config->get('platform.vault.aws_kms', [])));
+        }
+        // The cloud secret keyring is checked whenever it is configured: as
+        // the current driver, or as the unwrap side of a provider move.
+        if ($driver === 'cloud_secret' || ! empty($config->get('platform.vault.cloud_secret.key'))) {
+            array_push($problems, ...KekPolicy::problems((array) $config->get('platform.vault.cloud_secret', []), [
+                'APP_KEY' => $config->get('app.key'),
+                'AUDIT_HASH_KEY' => $config->get('platform.audit.hash_key'),
+                'SECRET_VAULT_FINGERPRINT_KEY' => $config->get('platform.vault.fingerprint_key'),
+                'SECRET_VAULT_LOCAL_KEK' => $config->get('platform.vault.local.key'),
+            ]));
+        }
 
-        return isset($settings[$driver]) ? $settings[$driver]() : [];
+        return $problems;
     }
 
     /**
