@@ -130,31 +130,58 @@ final class SecretVault
     }
 
     /**
-     * Re-wrap every DEK of the tenant with the KMS's current KEK (KEK
-     * rotation). Secrets themselves are untouched. Returns the number of keys.
+     * Re-wrap the tenant's data keys that are not yet under the current KEK
+     * (KEK rotation or provider move). Only the wrapping changes: secrets
+     * are not re-encrypted. Idempotent: keys already under the current KEK
+     * are skipped. Returns the number of keys re-wrapped.
      */
     public function rewrapDataKeys(?Actor $actor = null): int
     {
-        $this->context->requireTenant();
+        $tenantId = $this->context->requireTenant();
+        $current = $this->kms->currentKeyId();
 
-        return DB::transaction(function () use ($actor): int {
-            $keys = TenantDataKey::query()->lockForUpdate()->get();
+        return DB::transaction(function () use ($actor, $tenantId, $current): int {
+            $keys = TenantDataKey::query()->where('kek_id', '<>', $current)->lockForUpdate()->get();
+            if ($keys->isEmpty()) {
+                return 0;
+            }
 
+            $from = $keys->pluck('kek_id')->unique()->values()->all();
             foreach ($keys as $key) {
                 $dek = $this->unwrap($key);
                 $key->forceFill([
                     'wrapped_key' => $this->kms->wrap($dek, $this->wrapContext($key->tenant_id, $key->version)),
-                    'kek_id' => $this->kms->currentKeyId(),
+                    'kek_id' => $current,
                 ])->save();
             }
 
-            $this->audit->record(AuditAction::DataKeysRewrapped, 'tenant', $this->context->requireTenant(), [
+            $this->audit->record(AuditAction::DataKeysRewrapped, 'tenant', $tenantId, [
                 'keys' => $keys->count(),
-                'kek_id' => $this->kms->currentKeyId(),
+                'from_kek_ids' => $from,
+                'kek_id' => $current,
             ], $actor);
 
             return $keys->count();
         });
+    }
+
+    /**
+     * Unwrap one data key without returning it: proves the configured KEK
+     * opens it. Used by vault:verify-kek.
+     */
+    public function canUnwrap(int $version): bool
+    {
+        $this->context->requireTenant();
+        $key = TenantDataKey::query()->where('version', $version)->first();
+        if ($key === null) {
+            return false;
+        }
+
+        $dek = $this->unwrap($key);
+        $ok = strlen($dek) === 32;
+        sodium_memzero($dek);
+
+        return $ok;
     }
 
     /**
