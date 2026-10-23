@@ -16,8 +16,7 @@ use App\Observability\NullTracer;
 use App\Observability\Tracer;
 use App\Queue\QueueContextGuard;
 use App\Security\Vault\Contracts\KeyEncryptionService;
-use App\Security\Vault\Exceptions\VaultException;
-use App\Security\Vault\LocalKeyEncryptionService;
+use App\Security\Vault\KeyEncryptionServiceFactory;
 use App\Support\ProductionGuard;
 use App\Tenancy\Permission;
 use App\Tenancy\TenantContext;
@@ -52,12 +51,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(CommerceSourceFactory::class);
         $this->app->singleton(ContactNormalizer::class, fn () => new ContactNormalizer(config('commerce.marketplace_email_domains')));
 
-        $this->app->singleton(KeyEncryptionService::class, function () {
-            return match ($driver = config('platform.vault.kek_driver')) {
-                'local' => LocalKeyEncryptionService::fromConfig(config('platform.vault.local')),
-                default => throw new VaultException("KEK driver [{$driver}] is not implemented yet."),
-            };
-        });
+        $this->app->singleton(KeyEncryptionService::class, fn () => KeyEncryptionServiceFactory::make(config('platform.vault')));
     }
 
     public function boot(): void

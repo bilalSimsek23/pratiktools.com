@@ -24,6 +24,13 @@ return [
     |
     */
 
+    /*
+    | Proxies trusted for X-Forwarded-For/Proto/Port. Empty: the immediate
+    | peer on Laravel Cloud and in production, none elsewhere. A comma list
+    | of CIDRs adds proxies; "none" disables. Never "trust everyone".
+    */
+    'trusted_proxies' => env('TRUSTED_PROXIES'),
+
     'egress_static_ips' => array_values(array_filter(explode(',', (string) env('EGRESS_STATIC_IPS', '')))),
 
     /*
@@ -39,9 +46,12 @@ return [
     */
 
     'vault' => [
+        // local (development and tests only) or aws_kms. Production refuses
+        // to boot with anything but a real KMS driver.
         'kek_driver' => env('SECRET_VAULT_KEK_DRIVER', 'local'),
 
-        'allow_local_kek_in_production' => (bool) env('SECRET_VAULT_ALLOW_LOCAL_KEK_IN_PRODUCTION', false),
+        // Staging only: allows the local KEK there. Ignored in production.
+        'allow_local_kek_in_staging' => (bool) env('SECRET_VAULT_ALLOW_LOCAL_KEK_IN_STAGING', false),
 
         'local' => [
             'key_id' => env('SECRET_VAULT_LOCAL_KEK_ID', 'local-v1'),
@@ -49,6 +59,16 @@ return [
             // Comma separated "key_id:base64key" pairs kept for unwrapping
             // DEKs that were wrapped before a KEK rotation.
             'previous' => env('SECRET_VAULT_LOCAL_PREVIOUS_KEKS', ''),
+        ],
+
+        // Symmetric AWS KMS key (full key ARN, not an alias). Credentials
+        // belong to an IAM user allowed only kms:Encrypt and kms:Decrypt on
+        // this key.
+        'aws_kms' => [
+            'key_id' => env('SECRET_VAULT_AWS_KMS_KEY_ID'),
+            'region' => env('SECRET_VAULT_AWS_REGION', 'eu-central-1'),
+            'access_key_id' => env('SECRET_VAULT_AWS_ACCESS_KEY_ID'),
+            'secret_access_key' => env('SECRET_VAULT_AWS_SECRET_ACCESS_KEY'),
         ],
 
         // HMAC key for secret fingerprints, so a fingerprint can be compared
@@ -74,6 +94,20 @@ return [
     */
 
     'queues' => ['system', 'webhooks', 'sync', 'automation', 'send'],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Health
+    |--------------------------------------------------------------------------
+    */
+
+    'health' => [
+        // The scheduled heartbeat runs every minute.
+        'heartbeat_max_age_seconds' => (int) env('HEALTH_HEARTBEAT_MAX_AGE', 300),
+        // Set true once the scheduler and Horizon are enabled in production.
+        'require_heartbeat' => (bool) env('HEALTH_REQUIRE_HEARTBEAT', false),
+        'kms_cache_seconds' => (int) env('HEALTH_KMS_CACHE_SECONDS', 300),
+    ],
 
     /*
     |--------------------------------------------------------------------------

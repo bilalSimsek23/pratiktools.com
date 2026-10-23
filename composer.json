@@ -11,6 +11,7 @@
     "require": {
         "php": "^8.3",
         "ext-soap": "*",
+        "aws/aws-sdk-php": "^3.300",
         "laravel/framework": "^13.17",
         "laravel/horizon": "^5.50",
         "laravel/sanctum": "^4.3",
@@ -76,7 +77,7 @@
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
         ],
         "migrate:owner": [
-            "@php artisan migrate --database=pgsql_owner --force"
+            "@php artisan migrate --database=pgsql_owner --force --isolated"
         ],
         "lint": [
             "vendor/bin/pint --test"
