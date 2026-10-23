@@ -11,7 +11,6 @@
     "require": {
         "php": "^8.3",
         "ext-soap": "*",
-        "aws/aws-sdk-php": "^3.300",
         "laravel/framework": "^13.17",
         "laravel/horizon": "^5.50",
         "laravel/sanctum": "^4.3",
@@ -20,6 +19,7 @@
         "predis/predis": "^3.7"
     },
     "require-dev": {
+        "aws/aws-sdk-php": "^3.300",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.13",
         "laravel/pail": "^1.2.5",
@@ -28,6 +28,9 @@
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
         "phpunit/phpunit": "^12.5.12"
+    },
+    "suggest": {
+        "aws/aws-sdk-php": "Needed only for the optional aws_kms secret vault driver (production default is cloud_secret)."
     },
     "autoload": {
         "psr-4": {
