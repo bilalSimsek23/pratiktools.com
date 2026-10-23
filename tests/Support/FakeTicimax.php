@@ -32,6 +32,9 @@ final class FakeTicimax implements SoapTransport
     /** @var list<array<string, mixed>> */
     public array $carts = [];
 
+    /** @var list<array<string, mixed>> raw UyeIzinGecmisi rows */
+    public array $consentHistory = [];
+
     /** @var list<array{operation: string, parameters: array<string, mixed>}> */
     public array $calls = [];
 
@@ -102,6 +105,12 @@ final class FakeTicimax implements SoapTransport
                 'Sepetler' => $this->wrap($this->page($this->carts, ($parameters['sayfaSayisi'] - 1) * $this->cartPageSize, $this->cartPageSize), 'WebSepet'),
                 'Next' => count($this->carts) > $parameters['sayfaSayisi'] * $this->cartPageSize,
             ] : ['Sepetler' => [], 'Next' => false]],
+            'SelectUyeIzinGecmisi' => ['SelectUyeIzinGecmisiResult' => ['IsError' => false, 'IzinGecmisiList' => $authorized ? $this->wrap(array_values(array_filter(
+                $this->consentHistory,
+                // Like Ticimax: Deger = 1 means "all", -1 returns nothing.
+                fn ($r) => ($parameters['filtre']['Deger'] ?? -1) === 1
+                    && $r['Tarih'] >= $parameters['filtre']['DuzenlemeTarihBaslangic'] && $r['Tarih'] < $parameters['filtre']['DuzenlemeTarihBitis'],
+            )), 'UyeIzinGecmisi') : []]],
             default => throw new \LogicException("FakeTicimax does not implement {$operation}."),
         };
     }
@@ -171,6 +180,14 @@ final class FakeTicimax implements SoapTransport
             'DuzenlemeTarihi' => '2000-01-01T00:00:00', 'MailIzin' => true, 'SmsIzin' => false,
             'IzinGuncellemeTarihi' => '2025-01-10T12:00:00', 'UyeTuru' => 'Standart',
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function consentChange(int $id, int $memberId, int $tip, bool $value, string $email, string $at): array
+    {
+        return ['Id' => $id, 'UyeId' => $memberId, 'IzinTip' => $tip, 'Deger' => $value, 'MailAddress' => $email, 'CepTelefonu' => '05321112233', 'Telefon' => null, 'Kaynak' => 'TicimaxWeb', 'Tarih' => $at, 'Duzenleyen_Id' => $memberId];
     }
 
     /**
