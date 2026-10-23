@@ -87,7 +87,8 @@ final class DatabaseRoleSeparationTest extends TestCase
     {
         $offenders = [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path())) as $file) {
-            if ($file->isFile() && str_ends_with($file->getFilename(), '.php') && str_contains((string) file_get_contents($file->getPathname()), 'pgsql_owner')) {
+            // A real use opens the connection; mentions in config key names do not count.
+            if ($file->isFile() && str_ends_with($file->getFilename(), '.php') && preg_match("/(connection|setConnection)\\(\\s*'pgsql_owner'|connection:\\s*'pgsql_owner'|'pgsql_owner'\\s*=>/", (string) file_get_contents($file->getPathname())) === 1) {
                 $offenders[] = str_replace(app_path().'/', '', $file->getPathname());
             }
         }

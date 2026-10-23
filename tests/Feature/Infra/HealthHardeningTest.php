@@ -5,7 +5,7 @@ namespace Tests\Feature\Infra;
 use App\Health\HealthChecker;
 use App\Jobs\PlatformHeartbeat;
 use App\Security\Vault\Contracts\KeyEncryptionService;
-use App\Security\Vault\Exceptions\KmsUnavailable;
+use App\Security\Vault\Exceptions\VaultException;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Horizon\Contracts\MasterSupervisorRepository;
 use Laravel\Horizon\MasterSupervisor;
@@ -45,7 +45,7 @@ final class HealthHardeningTest extends TestCase
             public function flushExpired() {}
         });
         $this->app->forgetInstance(HealthChecker::class);
-        Cache::forget('health:kms');
+        Cache::forget('health:vault');
     }
 
     public function test_readiness_reports_role_rls_kms_and_scheduler_without_secrets(): void
@@ -57,18 +57,19 @@ final class HealthHardeningTest extends TestCase
         $response->assertJsonPath('checks.database.role', 'saas_app')
             ->assertJsonPath('checks.database.bypass_rls', false)
             ->assertJsonPath('checks.database.superuser', false)
-            ->assertJsonPath('checks.kms.status', 'ok')
-            ->assertJsonPath('checks.kms.driver', 'local')
+            ->assertJsonPath('checks.vault.status', 'ok')
+            ->assertJsonPath('checks.vault.reason', 'bootstrap_no_data_keys')
             ->assertJsonPath('checks.scheduler.status', 'ok');
 
+        $this->assertSame(['status', 'reason', 'cached'], array_keys($response->json('checks.vault')));
         $body = $response->getContent();
-        foreach ([config('database.connections.pgsql.password'), config('app.key'), config('platform.vault.local.key'), config('platform.vault.fingerprint_key'), config('platform.audit.hash_key'), config('database.connections.pgsql.host')] as $secret) {
+        foreach ([config('database.connections.pgsql.password'), config('app.key'), config('platform.vault.local.key'), config('platform.vault.local.key_id'), config('platform.vault.fingerprint_key'), config('platform.audit.hash_key'), config('database.connections.pgsql.host')] as $secret) {
             $this->assertStringNotContainsString((string) $secret, $body);
         }
         $this->assertStringNotContainsString('@', $body);
     }
 
-    public function test_kms_probe_is_cached(): void
+    public function test_vault_probe_is_cached(): void
     {
         $calls = 0;
         $real = app(KeyEncryptionService::class);
@@ -79,6 +80,11 @@ final class HealthHardeningTest extends TestCase
             public function currentKeyId(): string
             {
                 return $this->inner->currentKeyId();
+            }
+
+            public function knows(string $kekId): bool
+            {
+                return $this->inner->knows($kekId);
             }
 
             public function wrap(#[\SensitiveParameter] string $dataKey, string $context): string
@@ -94,23 +100,28 @@ final class HealthHardeningTest extends TestCase
             }
         });
 
-        $this->getJson('/health')->assertJsonPath('checks.kms.cached', false);
-        $this->getJson('/health')->assertJsonPath('checks.kms.cached', true);
+        $this->getJson('/health')->assertJsonPath('checks.vault.cached', false);
+        $this->getJson('/health')->assertJsonPath('checks.vault.cached', true);
         $this->assertSame(1, $calls);
     }
 
-    public function test_unreachable_kms_fails_readiness(): void
+    public function test_broken_current_kek_fails_readiness(): void
     {
         $this->app->instance(KeyEncryptionService::class, new class implements KeyEncryptionService
         {
             public function currentKeyId(): string
             {
-                return 'k';
+                return 'cs-0000000000000000';
+            }
+
+            public function knows(string $kekId): bool
+            {
+                return false;
             }
 
             public function wrap(#[\SensitiveParameter] string $dataKey, string $context): string
             {
-                throw new KmsUnavailable('AWS KMS encrypt failed temporarily (ThrottlingException).');
+                throw new VaultException('broken');
             }
 
             public function unwrap(string $wrappedKey, string $keyId, string $context): string
@@ -119,7 +130,7 @@ final class HealthHardeningTest extends TestCase
             }
         });
 
-        $this->getJson('/health')->assertStatus(503)->assertJsonPath('checks.kms.status', 'fail');
+        $this->getJson('/health')->assertStatus(503)->assertJsonPath('checks.vault.status', 'fail')->assertJsonPath('checks.vault.reason', 'current_key_failed');
     }
 
     public function test_wrong_runtime_role_fails_readiness(): void

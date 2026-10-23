@@ -3,7 +3,7 @@
 namespace App\Health;
 
 use App\Jobs\PlatformHeartbeat;
-use App\Security\Vault\Contracts\KeyEncryptionService;
+use App\Security\Vault\KekMaintenance;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -16,12 +16,12 @@ use Throwable;
  * Infrastructure health without personal data or secrets: status and
  * latency per component, the runtime database role and whether it can
  * bypass row-level security, queue backlog, Horizon, scheduler heartbeat
- * age and KMS reachability. Error details are never exposed, only the
+ * age and secret vault (KEK) status. Error details are never exposed, only the
  * exception class in logs.
  */
 class HealthChecker
 {
-    private const KMS_CACHE_KEY = 'health:kms';
+    private const VAULT_CACHE_KEY = 'health:vault';
 
     /**
      * @return array{status: string, checks: array<string, array<string, mixed>>}
@@ -34,7 +34,7 @@ class HealthChecker
             'redis' => $this->timed(fn () => Redis::connection()->ping()),
             'queue' => $this->queue(),
             'scheduler' => $this->scheduler(),
-            'kms' => $this->kms(),
+            'vault' => $this->vault(),
         ];
 
         $failed = collect($checks)->contains(fn (array $c) => $c['status'] === 'fail');
@@ -120,32 +120,28 @@ class HealthChecker
     }
 
     /**
-     * A wrap/unwrap round trip of a throwaway key. Cached briefly so the
-     * endpoint never turns into KMS traffic; failures are cached for less.
+     * Secret vault: the current KEK works and every KEK id in use is known
+     * to the resolver. Cached briefly (never an unwrap per request);
+     * failures are cached for less. Status and reason code only: no KEK,
+     * id, fingerprint or key material.
      *
      * @return array<string, mixed>
      */
-    protected function kms(): array
+    protected function vault(): array
     {
-        $cached = Cache::get(self::KMS_CACHE_KEY);
+        $cached = Cache::get(self::VAULT_CACHE_KEY);
         if (is_array($cached)) {
             return $cached + ['cached' => true];
         }
 
-        $start = hrtime(true);
-        $driver = (string) config('platform.vault.kek_driver');
-
         try {
-            $kms = app(KeyEncryptionService::class);
-            $probe = random_bytes(32);
-            $ok = hash_equals($probe, $kms->unwrap($kms->wrap($probe, 'health-check'), $kms->currentKeyId(), 'health-check'));
-            $result = ['status' => $ok ? 'ok' : 'fail', 'driver' => $driver, 'latency_ms' => round((hrtime(true) - $start) / 1e6, 1)];
+            $result = app(KekMaintenance::class)->quickStatus(app()->isProduction());
         } catch (Throwable $e) {
             report($e);
-            $result = ['status' => 'fail', 'driver' => $driver];
+            $result = ['status' => 'fail', 'reason' => KekMaintenance::CURRENT_KEY_FAILED];
         }
 
-        Cache::put(self::KMS_CACHE_KEY, $result, $result['status'] === 'ok' ? (int) config('platform.health.kms_cache_seconds') : 30);
+        Cache::put(self::VAULT_CACHE_KEY, $result, $result['status'] === 'ok' ? (int) config('platform.health.kms_cache_seconds') : 30);
 
         return $result + ['cached' => false];
     }
