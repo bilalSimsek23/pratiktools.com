@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\RequestDiagnosticsController;
 use App\Http\Controllers\Admin\TwoFactorController;
 use App\Http\Middleware\EnsurePlatformTwoFactor;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,7 @@ Route::name('admin.')->group(function () {
 
         Route::middleware(EnsurePlatformTwoFactor::class)->group(function () {
             Route::get('/', DashboardController::class)->name('dashboard');
+            Route::get('diagnostics/request', RequestDiagnosticsController::class)->name('diagnostics.request');
         });
     });
 });

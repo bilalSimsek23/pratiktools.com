@@ -4,10 +4,12 @@ use App\Http\Middleware\AssignRequestId;
 use App\Http\Middleware\RejectAdminHost;
 use App\Http\Middleware\ResolveTenantContext;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\TrustCloudProxies;
 use App\Tenancy\Exceptions\TenantContextMissing;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->replace(TrustProxies::class, TrustCloudProxies::class);
         $middleware->prepend(AssignRequestId::class);
         $middleware->append(SecurityHeaders::class);
 
