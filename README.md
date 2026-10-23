@@ -3,9 +3,10 @@
 Multi-tenant marketing automation platform for Ticimax stores. This repository
 is independent of the IGS admin application; IGS is the first tenant.
 
-Current phase: **F1 – Ticimax connector and read-only commerce sync** on top of
-the F0 platform foundation (tenancy, row-level security, secret vault, audit
-log, queues, health, CI). Nothing is ever written to Ticimax.
+Current phase: **F2 – Consent Engine and İYS read-only shadow sync**, on top of
+F1 (Ticimax read-only commerce sync) and F0 (tenancy, row-level security,
+secret vault, audit log, queues, health, CI). Nothing is ever written to
+Ticimax, İYS or any messaging provider.
 
 ## Architecture in one page
 
@@ -47,6 +48,28 @@ php artisan commerce:compare --tenant=demo      # counts and field-by-field chec
 ```
 
 API: `POST /api/v1/integrations/{id}/test`, `GET …/sync-status`, `POST …/sync`, `GET …/preview`.
+
+## Consent (F2, shadow mode)
+
+| Concern | How |
+| --- | --- |
+| Model | `consent_recipients` (normalized address) ↔ `recipient_customers` (no customer merge; shared e-mails/phones are links), `consents` (latest observation per recipient, channel, recipient type and source provider), append-only `consent_events`, derived `consent_conflicts`, audited `suppressions` (lifted, never deleted). |
+| Sources | `IYS` is authoritative. `TICIMAX` (MailIzin/SmsIzin and SelectUyeIzinGecmisi history), `TICIMAX_NEWSLETTER`, `LEAD_FORM`, `MANUAL`, `ONESIGNAL` (push, later), `KLAVIYO` (later) are evidence. |
+| İYS connector | `ConsentProvider` / `IysConsentConnector`: read operations only (`ReadOnlyModeViolation` otherwise, before any request); encrypted cached tokens with a refresh lock and the 10/hour token budget; bulk status (1,000 per call, returns ONAY only), single status (1,000/hour/IP), changes pull with `after` cursor (7-day window), daily summary. Production only with registered static egress IPs. |
+| Decision | `SendEligibility`: reason codes (`ALLOWED`, `IYS_REVOKED`, `IYS_UNKNOWN`, `IYS_UNAVAILABLE`, `LOCAL_SUPPRESSED`, `INVALID_EMAIL`, `MARKETPLACE_IDENTITY`, `IDENTITY_CONFLICT`, ...). RET always wins; doubt blocks. |
+
+```sh
+php artisan consent:build --tenant=demo                 # recipients, store flags, store history
+printf '%s' '{"username":"…","password":"…"}' | php artisan iys:connect --tenant=demo \
+    --iys-code=… --brand-code=… --environment=sandbox --secret-stdin
+php artisan consent:sync --tenant=demo --kind=iys_test
+php artisan consent:sync --tenant=demo --kind=iys_status --inline
+php artisan consent:sync --tenant=demo --kind=iys_resolve --inline
+php artisan consent:sync --tenant=demo --kind=iys_changes --inline
+php artisan consent:report --tenant=demo
+```
+
+API: `GET /api/v1/consent/overview`, `GET /api/v1/consent/reconciliation`, `GET /api/v1/consent/conflicts`, `GET /api/v1/customers/{id}/eligibility`.
 
 Static egress IP: provider allowlists (IYS, optionally OneSignal) require all
 outbound calls to leave through fixed IPs. Deploy workers behind a NAT gateway
