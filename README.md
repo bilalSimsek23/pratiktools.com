@@ -71,6 +71,12 @@ php artisan consent:report --tenant=demo
 
 API: `GET /api/v1/consent/overview`, `GET /api/v1/consent/reconciliation`, `GET /api/v1/consent/conflicts`, `GET /api/v1/customers/{id}/eligibility`.
 
+## Production (Laravel Cloud)
+
+See [docs/production/laravel-cloud.md](docs/production/laravel-cloud.md): boot safety rules, the
+database role bootstrap (`scripts/production/bootstrap-db-roles.sh`), `php artisan db:verify-roles`,
+deploy settings, Horizon sizing and scale-to-zero assumptions.
+
 Static egress IP: provider allowlists (IYS, optionally OneSignal) require all
 outbound calls to leave through fixed IPs. Deploy workers behind a NAT gateway
 with reserved IPs and list them in `EGRESS_STATIC_IPS`.
