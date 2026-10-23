@@ -82,7 +82,10 @@ jobs:
           php artisan migrate --database=pgsql_owner --force --env=testing
           php artisan migrate:rollback --database=pgsql_owner --force --env=testing
           test "$(PGPASSWORD=ci_superuser_password psql -h 127.0.0.1 -U postgres -d saas_testing -tAc "select count(*) from pg_tables where schemaname='public' and tablename <> 'migrations'")" = "0"
-          php artisan migrate --database=pgsql_owner --force --env=testing
+          php artisan migrate --database=pgsql_owner --force --isolated --env=testing
+
+      - name: Database roles, ownership, RLS and Super Admin isolation
+        run: php artisan db:verify-roles --env=testing
 
       - name: Unit tests
         run: vendor/bin/phpunit --testsuite=Unit
