@@ -13,8 +13,9 @@ artisan command except build-time ones) when:
 | --- | --- |
 | Debug off, secure and HTTP-only session cookies | `APP_DEBUG`, `SESSION_SECURE_COOKIE`, `SESSION_HTTP_ONLY` |
 | Keys present | `APP_KEY`, `SECRET_VAULT_FINGERPRINT_KEY`, `AUDIT_HASH_KEY` |
-| Real KMS only: `aws_kms`; local, empty, unknown or unimplemented drivers refused | `SECRET_VAULT_KEK_DRIVER` |
-| AWS KMS complete: key ARN (no alias) in the configured region, credentials set | `SECRET_VAULT_AWS_*` |
+| KEK driver `cloud_secret` (or optional `aws_kms`); local, empty, unknown or unimplemented drivers refused | `SECRET_VAULT_KEK_DRIVER` |
+| Platform KEK: base64 of 32 random bytes, not a known test key, not equal to `APP_KEY`, `AUDIT_HASH_KEY`, the fingerprint key or a previous KEK; at most 3 previous KEKs | `SECRET_VAULT_KEK`, `SECRET_VAULT_KEK_PREVIOUS` |
+| Optional AWS KMS complete: key ARN (no alias) in the configured region, credentials set, SDK installed | `SECRET_VAULT_AWS_*` |
 | Runtime connection is the app role, the three roles differ | `DB_USERNAME`, `DB_OWNER_USERNAME`, `DB_PLATFORM_USERNAME` |
 | No URL-configured runtime connection (`DB_URL` is ignored anyway) | — |
 | No transaction pooler (tenant context is a session setting) | `DB_HOST` without `-pooler` |
@@ -36,12 +37,12 @@ variables override the injected ones, so the runtime never sees it.
 
 ## Order of operations
 
-1. **AWS KMS** (eu-central-1): create a symmetric customer managed key with
-   automatic rotation; create an IAM user whose only permissions are
-   `kms:Encrypt` and `kms:Decrypt` on that key ARN; create an access key.
-2. **Generate secrets** locally: `APP_KEY` (`php artisan key:generate --show`),
+1. **Platform KEK**: on a trusted workstation run `php artisan vault:generate-kek`;
+   store the key in the offline escrow and as the Laravel Cloud Secret
+   `SECRET_VAULT_KEK` (see [secret-vault-rotation.md](secret-vault-rotation.md)).
+2. **Generate other secrets** locally: `APP_KEY` (`php artisan key:generate --show`),
    `SECRET_VAULT_FINGERPRINT_KEY`, `AUDIT_HASH_KEY` (`openssl rand -base64 32`),
-   three role passwords (`openssl rand -base64 36`).
+   three role passwords (`openssl rand -base64 36`). All as Cloud Secrets.
 3. **Bootstrap roles** from a trusted machine with psql 15+, using the
    database's administrator credential and the **direct** host:
    ```sh
@@ -56,16 +57,23 @@ variables override the injected ones, so the runtime never sees it.
    `DATABASE_URL`, it is ignored by the runtime connection.
 5. **Cloud deployment settings**
    - Build: `composer install --no-dev --optimize-autoloader --no-interaction`
-   - Deploy: `php artisan migrate --database=pgsql_owner --force --isolated`
-     (replace Cloud's default `php artisan migrate --force`, which runs as the
-     runtime role and fails by design)
+   - Deploy commands, in this order:
+     ```
+     php artisan vault:verify-kek
+     php artisan migrate --database=pgsql_owner --force --isolated
+     ```
+     `vault:verify-kek` stops the deploy if a configured KEK does not open
+     the data keys in use (an empty database passes as bootstrap). Replace
+     Cloud's default `php artisan migrate --force`, which runs as the runtime
+     role and fails by design.
    - Do not add `queue:restart`, `horizon:terminate`, `optimize:clear` or
      `storage:link`.
 6. **First deploy** with Horizon and Scheduler still off.
 7. **Verify** (Cloud "Commands" tab):
    - `php artisan db:verify-roles`: every line PASS.
+   - `php artisan vault:verify-kek`: PASS.
    - `GET /healthz` 200. `GET /health`: `database.role=saas_app`,
-     `bypass_rls=false`, `kms.status=ok`; `queue` fails until Horizon runs.
+     `bypass_rls=false`, `vault.status=ok`; `queue` fails until Horizon runs.
    - Log in to the admin host, open `/diagnostics/request`: `secure=true`,
      `client_ip` is your own address, `from_trusted_proxy=true`.
 8. **Worker cluster**: always awake (not following the App cluster), one
@@ -101,6 +109,15 @@ The application does not depend on any of them sleeping.
 redaction. Enabling Nightwatch makes Cloud set `LOG_CHANNEL=stack` with
 `laravel-cloud-socket`; that path bypasses our redaction tap, so add the tap
 to that stack before enabling Nightwatch logs.
+
+## Secret vault
+
+Production KEK driver is `cloud_secret` (Laravel Cloud Secret). AWS KMS
+stays available as an optional driver (`composer require aws/aws-sdk-php`,
+`SECRET_VAULT_KEK_DRIVER=aws_kms`); the cloud secret keyring then stays
+configured for unwrapping until `vault:rewrap --all` has moved every data
+key. Rotation, compromise response, escrow and the Laravel Cloud Commands
+risk: [secret-vault-rotation.md](secret-vault-rotation.md).
 
 ## İYS
 

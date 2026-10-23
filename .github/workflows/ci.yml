@@ -87,6 +87,9 @@ jobs:
       - name: Database roles, ownership, RLS and Super Admin isolation
         run: php artisan db:verify-roles --env=testing
 
+      - name: Secret vault KEK gate (deploy command)
+        run: php artisan vault:verify-kek --env=testing
+
       - name: Unit tests
         run: vendor/bin/phpunit --testsuite=Unit
 
