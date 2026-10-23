@@ -4,7 +4,9 @@ namespace App\Connectors\Ticimax;
 
 use App\Commerce\Contracts\CommerceSource;
 use App\Commerce\Contracts\LooksUpRecords;
+use App\Commerce\Contracts\ProvidesConsentHistory;
 use App\Commerce\Data\ConnectionCheck;
+use App\Commerce\Data\ConsentChange;
 use App\Commerce\Data\CustomerRecord;
 use App\Commerce\Data\OrderRecord;
 use App\Commerce\Data\ProductRecord;
@@ -34,7 +36,7 @@ use Carbon\CarbonImmutable;
  *   page with a fault ("... siparişler bulunamadı."), which the client
  *   turns into an empty result.
  */
-final class TicimaxCommerceConnector implements CommerceSource, LooksUpRecords
+final class TicimaxCommerceConnector implements CommerceSource, LooksUpRecords, ProvidesConsentHistory
 {
     private const MEMBER_FILTER = [
         'Aktif' => -1, 'AlisverisYapti' => -1, 'Cinsiyet' => -1, 'IlID' => -1, 'IlceID' => -1,
@@ -253,6 +255,50 @@ final class TicimaxCommerceConnector implements CommerceSource, LooksUpRecords
         $result = $this->client->call('UrunServis', 'SelectUrunCount', ['f' => self::PRODUCT_FILTER]);
 
         return is_numeric($result['SelectUrunCountResult'] ?? null) ? (int) $result['SelectUrunCountResult'] : null;
+    }
+
+    /**
+     * Member permission changes (UyeServis.SelectUyeIzinGecmisi). Verified
+     * live: the call has no paging, so callers use short windows (a month
+     * holds ~600 rows for IGS; multi-year windows time out); Deger = 1
+     * returns both granted and revoked rows (0 only revoked, -1 nothing);
+     * IzinTip 1 is SMS and 2 is e-mail (100 % agreement with the members'
+     * SmsIzin / MailIzin on 1,214 latest changes).
+     */
+    public function consentHistory(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $result = $this->client->call('UyeServis', 'SelectUyeIzinGecmisi', ['filtre' => [
+            'Deger' => 1, 'Duzenleyen_Id' => -1, 'Id' => -1, 'IzinTip' => -1, 'Kaynak' => '', 'UyeId' => -1,
+            'DuzenlemeTarihBaslangic' => R::filterDate($from, $this->tz()),
+            'DuzenlemeTarihBitis' => R::filterDate($to, $this->tz()),
+        ]]);
+
+        $changes = [];
+        foreach (R::list($result['SelectUyeIzinGecmisiResult']['IzinGecmisiList'] ?? null, 'UyeIzinGecmisi') as $row) {
+            $channel = match ((int) ($row['IzinTip'] ?? 0)) {
+                1 => ConsentChange::SMS,
+                2 => ConsentChange::EMAIL,
+                default => null,
+            };
+            $id = R::id($row['Id'] ?? null);
+            $at = R::date($row['Tarih'] ?? null, $this->tz());
+            if ($channel === null || $id === null || $at === null || ! is_bool($row['Deger'] ?? null)) {
+                continue;
+            }
+
+            $changes[] = new ConsentChange(
+                externalId: $id,
+                memberExternalId: R::id($row['UyeId'] ?? null),
+                channel: $channel,
+                granted: $row['Deger'],
+                email: R::string($row['MailAddress'] ?? null),
+                phone: R::string($row['CepTelefonu'] ?? null) ?? R::string($row['Telefon'] ?? null),
+                source: R::string($row['Kaynak'] ?? null),
+                occurredAt: $at,
+            );
+        }
+
+        return $changes;
     }
 
     /**

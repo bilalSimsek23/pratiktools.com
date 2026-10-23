@@ -4,6 +4,7 @@ use App\Commerce\Sync\SyncMode;
 use App\Jobs\PlatformHeartbeat;
 use App\Jobs\RecordTenantIntegrationHealth;
 use App\Jobs\ScheduleCommerceSync;
+use App\Jobs\ScheduleConsentSync;
 use App\Queue\TenantFanout;
 use Illuminate\Support\Facades\Schedule;
 
@@ -45,4 +46,17 @@ if (config('commerce.schedule.enabled')) {
         ->cron(config('commerce.schedule.reconciliation'))
         ->name('commerce-reconciliation')
         ->withoutOverlapping();
+}
+
+/*
+| Consent shadow sync (read-only). Off unless CONSENT_SYNC_SCHEDULE_ENABLED=true.
+*/
+
+if (config('consent.schedule.enabled')) {
+    foreach (['iys_changes' => 'changes', 'iys_status' => 'status', 'ticimax_history' => 'ticimax_history'] as $kind => $key) {
+        Schedule::call(fn () => app(TenantFanout::class)->dispatch(fn (string $tenantId) => new ScheduleConsentSync($kind, $tenantId)))
+            ->cron(config("consent.schedule.{$key}"))
+            ->name("consent-sync-{$kind}")
+            ->withoutOverlapping();
+    }
 }

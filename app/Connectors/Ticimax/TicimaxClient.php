@@ -25,7 +25,7 @@ final class TicimaxClient
      * are rejected before any network call.
      */
     public const READ_OPERATIONS = [
-        'UyeServis' => ['SelectUyeler'],
+        'UyeServis' => ['SelectUyeler', 'SelectUyeIzinGecmisi'],
         'CustomServis' => ['SelectMailList'],
         'SiparisServis' => ['SelectSiparis', 'SelectSepet', 'SelectSiparisDurumlari'],
         'UrunServis' => ['SelectUrun', 'SelectUrunCount', 'SelectKategori'],
