@@ -112,6 +112,21 @@ return [
             'ticimax' => [
                 'tenant' => ['capacity' => 4, 'refill_per_second' => 2],
             ],
+            // İYS limits apply per caller IP, i.e. platform-wide. The API
+            // answers H124 ("per-second limit") without publishing it, so
+            // the general bucket is conservative.
+            'iys' => [
+                'tenant' => ['capacity' => 3, 'refill_per_second' => 2],
+                'global' => ['capacity' => 5, 'refill_per_second' => 4],
+            ],
+            // Token endpoint: 10 requests per hour per IP.
+            'iys_token' => [
+                'global' => ['capacity' => 8, 'refill_per_second' => 8 / 3600],
+            ],
+            // Single status: 1,000 requests per hour per IP (90 % used).
+            'iys_status' => [
+                'global' => ['capacity' => 30, 'refill_per_second' => 900 / 3600],
+            ],
         ],
     ],
 

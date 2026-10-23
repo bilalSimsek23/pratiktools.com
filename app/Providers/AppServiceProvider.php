@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use App\Commerce\CommerceSourceFactory;
 use App\Commerce\Identity\ContactNormalizer;
+use App\Connectors\Iys\IysPushHandler;
+use App\Connectors\Iys\IysPushVerifier;
+use App\Consent\ConsentProviderFactory;
 use App\Integrations\ProviderRegistry;
 use App\Logging\Redactor;
 use App\Models\PersonalAccessToken;
@@ -38,6 +41,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(TenantDirectory::class);
         $this->app->singleton(QueueContextGuard::class);
         $this->app->singleton(ProviderRegistry::class);
+        $this->app->singleton(ConsentProviderFactory::class);
+        $this->app->resolving(ProviderRegistry::class, function (ProviderRegistry $registry, $app) {
+            $registry->registerSignatureVerifier('iys', $app->make(IysPushVerifier::class));
+            $registry->registerWebhookHandler('iys', $app->make(IysPushHandler::class));
+        });
         $this->app->singleton(Redactor::class);
         $this->app->singleton(ErrorReporter::class, NullErrorReporter::class);
         $this->app->singleton(Tracer::class, NullTracer::class);
