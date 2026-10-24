@@ -191,3 +191,24 @@ not an SES invoice.
    `send_email`, `EMAIL_SENDING_MODE=test_only`, tenant `sending_mode=internal`,
    `email:test`, then set both back to off.
 6. Only after İYS is available (F2): pilot marketing under the warm-up plan.
+
+## F4 closing status (2026-10-24)
+
+Real AWS validation for IGS, read-only (GetAccount, GetEmailIdentity):
+
+| Item | State |
+| --- | --- |
+| SES API connection | works (SigV4, eu-central-1); credentials only in the tenant vault |
+| Region | eu-central-1 |
+| sending_enabled | true |
+| enforcement_status | HEALTHY |
+| Account | sandbox (production_access = false) |
+| Sandbox limits | 200 messages / 24 h, 1 message / s |
+| Sender identity | igs.net.tr verified |
+| DKIM | verified (Easy DKIM, 3 CNAME records) |
+| Custom MAIL FROM | not configured yet (SPF passes on SES's domain but is not aligned; DMARC aligns via DKIM) |
+| Production access | not granted. Requested; the last account check reported review status DENIED, and the additional information AWS asked for was sent through the support case |
+
+Until production access is granted live marketing stays off and
+`EMAIL_SENDING_MODE` stays off (test_only only for an approved test send).
+Independently, marketing stays fail-closed while İYS (F2) is unavailable.
