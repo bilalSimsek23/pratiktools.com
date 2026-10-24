@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Integrations\ProviderRegistry;
 use App\Tenancy\TenantDirectory;
+use App\Webhooks\Contracts\DescribesWebhookEvents;
 use App\Webhooks\WebhookInbox;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,11 +41,12 @@ final class WebhookController extends Controller
         $signatureStatus = $verifier?->verify($request, $tenantId) ?? 'not_configured';
         abort_if(in_array($signatureStatus, ['invalid', 'missing'], true), 401);
 
+        $describes = $verifier instanceof DescribesWebhookEvents ? $verifier : null;
         $result = $inbox->accept(
             tenantId: $tenantId,
             provider: $provider,
-            eventType: $this->stringOrNull($payload['type'] ?? $payload['event'] ?? $request->header('X-Event-Type')),
-            externalEventId: $this->stringOrNull($request->header('X-Webhook-Id') ?? $payload['event_id'] ?? $payload['id'] ?? null),
+            eventType: $this->stringOrNull($describes?->eventType($request, $payload) ?? $payload['type'] ?? $payload['event'] ?? $request->header('X-Event-Type')),
+            externalEventId: $this->stringOrNull($describes?->eventId($request, $payload) ?? $request->header('X-Webhook-Id') ?? $payload['event_id'] ?? $payload['id'] ?? null),
             payload: $payload,
             headers: $this->minimizedHeaders($request),
             signatureStatus: $signatureStatus,

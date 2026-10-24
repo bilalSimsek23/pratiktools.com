@@ -7,6 +7,8 @@ use App\Commerce\Identity\ContactNormalizer;
 use App\Connectors\Iys\IysPushHandler;
 use App\Connectors\Iys\IysPushVerifier;
 use App\Connectors\Ses\SesClientFactory;
+use App\Connectors\Ses\SesWebhookHandler;
+use App\Connectors\Ses\SnsMessageVerifier;
 use App\Consent\ConsentProviderFactory;
 use App\Email\EmailProviderResolver;
 use App\Integrations\ProviderRegistry;
@@ -46,6 +48,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->resolving(ProviderRegistry::class, function (ProviderRegistry $registry, $app) {
             $registry->registerSignatureVerifier('iys', $app->make(IysPushVerifier::class));
             $registry->registerWebhookHandler('iys', $app->make(IysPushHandler::class));
+            $registry->registerSignatureVerifier('amazon_ses', $app->make(SnsMessageVerifier::class));
+            $registry->registerWebhookHandler('amazon_ses', $app->make(SesWebhookHandler::class));
         });
         $this->app->singleton(EmailProviderResolver::class);
         $this->app->resolving(EmailProviderResolver::class, function (EmailProviderResolver $resolver, $app) {
