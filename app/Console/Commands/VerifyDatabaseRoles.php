@@ -25,6 +25,8 @@ final class VerifyDatabaseRoles extends Command
         'consent_recipients', 'consents', 'consent_events', 'consent_conflicts', 'suppressions', 'recipient_customers',
         'tenant_data_keys', 'users', 'personal_access_tokens',
         'push_profiles', 'push_subscriptions', 'push_identity_mappings', 'push_suppressions', 'test_recipients', 'push_send_requests',
+        'email_sender_identities', 'email_templates', 'email_template_versions', 'email_audience_snapshots', 'email_audience_members',
+        'email_messages', 'email_events', 'email_unsubscribes', 'email_usage_daily', 'consent_write_intents',
     ];
 
     /** Tables the platform role may read metadata of, but never these columns. */

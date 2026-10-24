@@ -38,4 +38,16 @@ enum AuditAction: string
     case PushFailed = 'push.failed';
     case PushBlocked = 'push.blocked';
     case PushIdentityMappingChanged = 'push.identity_mapping_changed';
+    case EmailTestRecipientAdded = 'email.test_recipient_added';
+    case EmailTestRecipientRemoved = 'email.test_recipient_removed';
+    case EmailSenderIdentitySaved = 'email.sender_identity_saved';
+    case EmailSendRequested = 'email.send_requested';
+    case EmailSent = 'email.sent';
+    case EmailBlocked = 'email.blocked';
+    case EmailDeferred = 'email.deferred';
+    case EmailFailed = 'email.failed';
+    case EmailAccountChecked = 'email.account_checked';
+    case EmailUnsubscribed = 'email.unsubscribed';
+    case EmailTemplateVersionCreated = 'email.template_version_created';
+    case EmailAudienceSnapshotCreated = 'email.audience_snapshot_created';
 }

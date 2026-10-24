@@ -20,6 +20,7 @@ final class ProviderRegistry
         'iys' => ['consent'],
         'klaviyo' => ['email'],
         'onesignal' => ['push'],
+        'amazon_ses' => ['email'],
     ];
 
     /** @var array<string, IntegrationVerifier> */

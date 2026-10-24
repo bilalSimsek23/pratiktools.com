@@ -15,6 +15,8 @@ enum ConsentSourceProvider: string
     case Manual = 'MANUAL';
     case OneSignal = 'ONESIGNAL';
     case Klaviyo = 'KLAVIYO';
+    // The recipient's own action on PratikTools (unsubscribe link).
+    case PratikTools = 'PRATIKTOOLS';
 
     public function isAuthoritative(): bool
     {
