@@ -30,7 +30,7 @@ final class Redactor
         'platform.vault.local.previous', 'platform.vault.fingerprint_key', 'platform.audit.hash_key',
         'platform.vault.aws_kms.secret_access_key', 'database.connections.pgsql.password',
         'database.connections.pgsql_owner.password', 'database.connections.pgsql_platform.password',
-        'database.redis.default.password',
+        'database.redis.default.password', 'email.unsubscribe.key',
     ];
 
     /** @var list<string>|null */

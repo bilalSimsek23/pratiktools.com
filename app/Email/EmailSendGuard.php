@@ -37,6 +37,7 @@ final class EmailSendGuard
         private readonly TenantContext $context,
         private readonly SendEligibility $eligibility,
         private readonly EmailProviderResolver $providers,
+        private readonly UnsubscribeTokens $unsubscribe,
     ) {}
 
     public function mode(): EmailSendingMode
@@ -148,6 +149,9 @@ final class EmailSendGuard
             throw new EmailSendBlocked($decision->reason->value, "The Consent Engine does not allow marketing mail ({$decision->reason->value}).");
         }
 
+        if (! $this->unsubscribe->available()) {
+            throw new EmailSendBlocked('UNSUBSCRIBE_UNAVAILABLE', 'EMAIL_UNSUBSCRIBE_KEY is not configured: no marketing mail without a working unsubscribe.');
+        }
         $unsubscribe = $email->headers['List-Unsubscribe'] ?? '';
         if (! str_contains($unsubscribe, '<https://') || ($email->headers['List-Unsubscribe-Post'] ?? null) !== 'List-Unsubscribe=One-Click') {
             throw new EmailSendBlocked('UNSUBSCRIBE_MISSING', 'Marketing mail needs a one-click unsubscribe header.');

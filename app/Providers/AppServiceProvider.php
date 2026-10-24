@@ -113,5 +113,7 @@ class AppServiceProvider extends ServiceProvider
         ));
 
         RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(600)->by('webhook:'.$request->ip()));
+
+        RateLimiter::for('unsubscribe', fn (Request $request) => Limit::perMinute(60)->by('unsubscribe:'.$request->ip()));
     }
 }

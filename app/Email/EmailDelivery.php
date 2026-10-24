@@ -40,6 +40,7 @@ final class EmailDelivery
         private readonly EmailProviderResolver $providers,
         private readonly RecipientDirectory $recipients,
         private readonly EmailUsage $usage,
+        private readonly UnsubscribeTokens $unsubscribe,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -55,12 +56,18 @@ final class EmailDelivery
         }
 
         $id = (string) Str::uuid7();
+        $normalized = $this->recipients->email(MessageRules::address($draft->to, 'INVALID_RECIPIENT'));
+        $recipientId = $normalized === null ? null : ($this->recipients->ensure('email', [$normalized])[$normalized['address']] ?? null);
+
+        // Marketing always carries a one-click unsubscribe for its recipient.
+        $headers = $draft->headers;
+        if ($draft->type === EmailMessageType::Marketing && $recipientId !== null && ! isset($headers['List-Unsubscribe']) && $this->unsubscribe->available()) {
+            $headers += $this->unsubscribe->headers($this->unsubscribe->url($this->unsubscribe->issue($tenantId, $recipientId)));
+        }
+
         // Validates addresses, headers, subject and size before anything is stored.
         $email = new OutboundEmail($id, $key, $draft->type, $draft->to, $identity->from_email, $identity->from_name, $identity->reply_to_email,
-            $draft->subject, $draft->html, $draft->text, $draft->headers, $draft->tags);
-
-        $normalized = $this->recipients->email($email->to);
-        $recipientId = $normalized === null ? null : ($this->recipients->ensure('email', [$normalized])[$normalized['address']] ?? null);
+            $draft->subject, $draft->html, $draft->text, $headers, $draft->tags);
 
         $row = DB::selectOne(
             'INSERT INTO email_messages (id, tenant_id, integration_id, sender_identity_id, provider, campaign_id, automation_run_id, snapshot_id, template_version_id,
