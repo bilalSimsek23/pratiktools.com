@@ -71,6 +71,13 @@ php artisan consent:report --tenant=demo
 
 API: `GET /api/v1/consent/overview`, `GET /api/v1/consent/reconciliation`, `GET /api/v1/consent/conflicts`, `GET /api/v1/customers/{id}/eligibility`.
 
+## Push (F3, OneSignal)
+
+Read-only OneSignal sync into `push_profiles` / `push_subscriptions`, trusted-identifier
+identity resolution, push eligibility separate from e-mail/SMS consent, and guarded test pushes
+(`PUSH_SENDING_MODE` off by default, test allowlist, `send_push` scope). See
+[docs/production/onesignal.md](docs/production/onesignal.md).
+
 ## Production (Laravel Cloud)
 
 See [docs/production/laravel-cloud.md](docs/production/laravel-cloud.md): boot safety rules, the
