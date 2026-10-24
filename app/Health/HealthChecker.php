@@ -2,6 +2,8 @@
 
 namespace App\Health;
 
+use App\Email\EmailSendingMode;
+use App\Email\UnsubscribeTokens;
 use App\Jobs\PlatformHeartbeat;
 use App\Push\PushSendingMode;
 use App\Security\Vault\KekMaintenance;
@@ -37,6 +39,7 @@ class HealthChecker
             'scheduler' => $this->scheduler(),
             'vault' => $this->vault(),
             'onesignal' => $this->onesignal(),
+            'email' => $this->email(),
         ];
 
         $failed = collect($checks)->contains(fn (array $c) => $c['status'] === 'fail');
@@ -175,6 +178,35 @@ class HealthChecker
             'integrations' => $total,
             'needing_attention' => $attention,
             'sending_mode' => PushSendingMode::platform()->value,
+        ];
+    }
+
+    /**
+     * Platform-wide view of e-mail delivery integrations, like onesignal():
+     * database only, warn (never fail), no secrets, no tenant names.
+     *
+     * @return array<string, mixed>
+     */
+    protected function email(): array
+    {
+        try {
+            $rows = DB::connection('pgsql_platform')->table('tenant_integrations')->where('capability', 'email')->where('provider', 'amazon_ses')
+                ->selectRaw('status, count(*) AS n')->groupBy('status')->pluck('n', 'status')->all();
+        } catch (Throwable $e) {
+            report($e);
+
+            return ['status' => 'warn', 'reason' => 'unavailable'];
+        }
+
+        $total = (int) array_sum($rows);
+        $attention = $total - (int) ($rows['connected'] ?? 0) - (int) ($rows['pending'] ?? 0);
+
+        return [
+            'status' => $total === 0 ? 'not_configured' : ($attention > 0 ? 'warn' : 'ok'),
+            'integrations' => $total,
+            'needing_attention' => $attention,
+            'sending_mode' => EmailSendingMode::platform()->value,
+            'unsubscribe_configured' => app(UnsubscribeTokens::class)->available(),
         ];
     }
 

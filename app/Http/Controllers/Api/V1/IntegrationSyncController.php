@@ -8,6 +8,7 @@ use App\Commerce\DataPreview;
 use App\Commerce\Sync\SyncEntity;
 use App\Commerce\Sync\SyncMode;
 use App\Commerce\SyncHealth;
+use App\Email\EmailMetrics;
 use App\Http\Controllers\Controller;
 use App\Jobs\SyncCommerceEntity;
 use App\Models\TenantIntegration;
@@ -90,6 +91,16 @@ final class IntegrationSyncController extends Controller
         Gate::authorize(Permission::IntegrationsView->value);
         if ($integration->provider !== 'onesignal') {
             throw ValidationException::withMessages(['integration' => 'Not a OneSignal integration.']);
+        }
+
+        return response()->json(['data' => $metrics->for($integration)]);
+    }
+
+    public function emailMetrics(TenantIntegration $integration, EmailMetrics $metrics): JsonResponse
+    {
+        Gate::authorize(Permission::IntegrationsView->value);
+        if ($integration->capability !== 'email' || $integration->provider !== 'amazon_ses') {
+            throw ValidationException::withMessages(['integration' => 'Not an e-mail delivery integration.']);
         }
 
         return response()->json(['data' => $metrics->for($integration)]);

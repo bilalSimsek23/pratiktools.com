@@ -38,6 +38,7 @@ Route::prefix('v1')->group(function () {
         Route::post('integrations/{integration}/sync', [IntegrationSyncController::class, 'sync'])->middleware('throttle:6,1');
         Route::get('integrations/{integration}/preview', [IntegrationSyncController::class, 'preview']);
         Route::get('integrations/{integration}/push-metrics', [IntegrationSyncController::class, 'pushMetrics']);
+        Route::get('integrations/{integration}/email-metrics', [IntegrationSyncController::class, 'emailMetrics']);
 
         Route::get('customers', [CustomerController::class, 'index']);
         Route::get('customers/{customer}', [CustomerController::class, 'show']);
