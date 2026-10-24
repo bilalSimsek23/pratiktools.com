@@ -19,7 +19,7 @@ final class Redactor
 {
     public const REDACTED = '[redacted]';
 
-    private const SENSITIVE_KEY = '/(secret|passw|token|api[_-]?key|authorization|cookie|signature|private[_-]?key|encrypted|credential|otp|two_factor|secret_vault_|app_key|audit_hash_key|fingerprint_key|\\bkek\\b|_kek\\b|kek_)/i';
+    private const SENSITIVE_KEY = '/(secret|passw|token|api[_-]?key|access[_-]?key|authorization|cookie|signature|private[_-]?key|encrypted|credential|otp|two_factor|secret_vault_|app_key|audit_hash_key|fingerprint_key|\\bkek\\b|_kek\\b|kek_)/i';
 
     /**
      * Configured secrets that must never appear in any logged string, even

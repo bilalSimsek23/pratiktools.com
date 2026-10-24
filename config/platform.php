@@ -174,6 +174,12 @@ return [
             'onesignal_send' => [
                 'tenant' => ['capacity' => 5, 'refill_per_second' => 2],
             ],
+            // SES API v2 account/identity reads (not sending): low and
+            // fixed. Sends use a dynamic bucket from the account's
+            // MaxSendRate (tenant:{id}:amazon_ses).
+            'amazon_ses_read' => [
+                'tenant' => ['capacity' => 2, 'refill_per_second' => 1],
+            ],
             // Single status: 1,000 requests per hour per IP (90 % used).
             'iys_status' => [
                 'global' => ['capacity' => 30, 'refill_per_second' => 900 / 3600],

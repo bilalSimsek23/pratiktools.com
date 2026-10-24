@@ -21,6 +21,13 @@ final class ProviderError extends RuntimeException
 
     public const SCHEMA_MISMATCH = 'schema_mismatch';
 
+    // The provider's sending quota is used up: wait, do not retry now.
+    public const QUOTA_EXHAUSTED = 'quota_exhausted';
+
+    // The request may or may not have been processed (e.g. a read timeout
+    // after sending). Never retried automatically for non-idempotent calls.
+    public const AMBIGUOUS = 'ambiguous';
+
     public function __construct(
         public readonly string $category,
         string $message,

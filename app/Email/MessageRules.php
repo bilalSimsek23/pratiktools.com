@@ -73,7 +73,8 @@ final class MessageRules
 
     /**
      * Message tags: provider-neutral, but kept within the strictest common
-     * rules (ASCII letters, digits, "_", "-", ".", up to 256 characters).
+     * rules (ASCII letters, digits, "_", "-", up to 256 characters; the
+     * same rule as SES message tags).
      *
      * @param  array<array-key, mixed>  $tags  as stored (JSON), checked here
      * @return array<string, string>
@@ -82,8 +83,8 @@ final class MessageRules
     {
         $clean = [];
         foreach ($tags as $name => $value) {
-            if (preg_match('/^[A-Za-z0-9_\-]{1,256}$/', (string) $name) !== 1 || ! is_string($value) || preg_match('/^[A-Za-z0-9_\-.@]{1,256}$/', $value) !== 1) {
-                throw new InvalidEmailMessage('INVALID_TAG', 'Tags may contain only letters, digits, "_", "-" and ".".');
+            if (preg_match('/^[A-Za-z0-9_\-]{1,256}$/', (string) $name) !== 1 || ! is_string($value) || preg_match('/^[A-Za-z0-9_\-]{1,256}$/', $value) !== 1) {
+                throw new InvalidEmailMessage('INVALID_TAG', 'Tags may contain only letters, digits, "_" and "-".');
             }
             $clean[(string) $name] = $value;
         }

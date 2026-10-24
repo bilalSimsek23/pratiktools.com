@@ -6,7 +6,9 @@ use App\Commerce\CommerceSourceFactory;
 use App\Commerce\Identity\ContactNormalizer;
 use App\Connectors\Iys\IysPushHandler;
 use App\Connectors\Iys\IysPushVerifier;
+use App\Connectors\Ses\SesClientFactory;
 use App\Consent\ConsentProviderFactory;
+use App\Email\EmailProviderResolver;
 use App\Integrations\ProviderRegistry;
 use App\Logging\Redactor;
 use App\Models\PersonalAccessToken;
@@ -44,6 +46,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->resolving(ProviderRegistry::class, function (ProviderRegistry $registry, $app) {
             $registry->registerSignatureVerifier('iys', $app->make(IysPushVerifier::class));
             $registry->registerWebhookHandler('iys', $app->make(IysPushHandler::class));
+        });
+        $this->app->singleton(EmailProviderResolver::class);
+        $this->app->resolving(EmailProviderResolver::class, function (EmailProviderResolver $resolver, $app) {
+            $resolver->register('amazon_ses', $app->make(SesClientFactory::class));
         });
         $this->app->singleton(Redactor::class);
         $this->app->singleton(ErrorReporter::class, NullErrorReporter::class);
