@@ -28,7 +28,9 @@ enum EmailMessageType: string
 
     /**
      * Suppression sources that stop this type. Address problems (bounces,
-     * invalid, manual) stop everything; opt-outs stop marketing only.
+     * invalid, manual) stop everything; opt-outs and spam complaints stop
+     * marketing only (the customer's own order or password mail still
+     * goes out).
      *
      * @return list<string>
      */
@@ -36,8 +38,8 @@ enum EmailMessageType: string
     {
         $always = ['MANUAL', 'INVALID_EMAIL', 'SYSTEM', 'SES_BOUNCE', 'KLAVIYO_BOUNCE', 'SOFT_BOUNCE'];
 
-        return $this === self::Marketing
-            ? [...$always, 'SES_COMPLAINT', 'KLAVIYO_SPAM', 'UNSUBSCRIBE', 'KLAVIYO_UNSUBSCRIBE', 'IYS_RET']
-            : [...$always, 'SES_COMPLAINT', 'KLAVIYO_SPAM'];
+        return $this === self::Transactional
+            ? $always
+            : [...$always, 'SES_COMPLAINT', 'KLAVIYO_SPAM', 'UNSUBSCRIBE', 'KLAVIYO_UNSUBSCRIBE', 'IYS_RET'];
     }
 }

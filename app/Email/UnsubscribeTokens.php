@@ -6,7 +6,7 @@ use RuntimeException;
 
 /**
  * Signed unsubscribe tokens: base64url(JSON {v, t: tenant, r: recipient,
- * i: issued at}) "." base64url(HMAC-SHA256). Tenant and recipient bound,
+ * i: issued at, n: nonce}) "." base64url(HMAC-SHA256). Tenant and recipient bound,
  * tamper-proof, expiring (email.unsubscribe.ttl_days). The key is
  * EMAIL_UNSUBSCRIBE_KEY (32+ random bytes); without it no marketing link
  * can be issued, so marketing sending stays closed.
@@ -21,7 +21,8 @@ final class UnsubscribeTokens
     public function issue(string $tenantId, string $recipientId): string
     {
         $key = $this->key() ?? throw new RuntimeException('EMAIL_UNSUBSCRIBE_KEY is not configured.');
-        $payload = self::b64(json_encode(['v' => 1, 't' => $tenantId, 'r' => $recipientId, 'i' => time()], JSON_THROW_ON_ERROR));
+        // n: per-link nonce, so every link is its own token (applied once each).
+        $payload = self::b64(json_encode(['v' => 1, 't' => $tenantId, 'r' => $recipientId, 'i' => now()->getTimestamp(), 'n' => bin2hex(random_bytes(6))], JSON_THROW_ON_ERROR));
 
         return $payload.'.'.self::b64(hash_hmac('sha256', $payload, $key, true));
     }
@@ -56,7 +57,8 @@ final class UnsubscribeTokens
         if (! is_array($data) || ($data['v'] ?? null) !== 1 || ! is_string($data['t'] ?? null) || ! is_string($data['r'] ?? null) || ! is_int($data['i'] ?? null)) {
             throw new InvalidUnsubscribeToken('malformed');
         }
-        if ($data['i'] < time() - 86400 * (int) config('email.unsubscribe.ttl_days') || $data['i'] > time() + 300) {
+        $now = now()->getTimestamp();
+        if ($data['i'] < $now - 86400 * (int) config('email.unsubscribe.ttl_days') || $data['i'] > $now + 300) {
             throw new InvalidUnsubscribeToken('expired');
         }
 

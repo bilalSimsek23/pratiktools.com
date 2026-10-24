@@ -34,8 +34,9 @@ final class TemplateRenderer
      */
     public function variables(string $template): array
     {
+        // "{{{ raw }}}" (unescaped output elsewhere) is refused, not treated as escaped.
         $stripped = preg_replace(self::TAG, '', $template);
-        if (! is_string($stripped) || str_contains($stripped, '{{') || str_contains($stripped, '}}')) {
+        if (! is_string($stripped) || str_contains($stripped, '{{') || str_contains($stripped, '}}') || str_contains($template, '{{{') || str_contains($template, '}}}')) {
             throw new TemplateError('INVALID_SYNTAX', 'Only {{ variable }} and {{ variable | default: "text" }} are allowed.');
         }
 
