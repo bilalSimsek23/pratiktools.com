@@ -48,8 +48,15 @@ final class SesEmailProvider implements EmailProvider, InspectsSenderIdentities
 
     public function capabilities(): EmailCapabilities
     {
+        return self::capabilitiesFor((array) $this->integration->settings);
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     */
+    public static function capabilitiesFor(array $settings): EmailCapabilities
+    {
         $caps = [EmailCapability::SendEmail, EmailCapability::RawHtml, EmailCapability::CustomHeaders, EmailCapability::Tags, EmailCapability::ProviderTemplate];
-        $settings = (array) $this->integration->settings;
         if (($settings['configuration_set'] ?? null) !== null && ($settings['sns_topic_arns'] ?? []) !== []) {
             array_push($caps, EmailCapability::WebhookEvents, EmailCapability::BounceEvents, EmailCapability::ComplaintEvents, EmailCapability::DeliveryEvents);
             foreach ((array) ($settings['tracking'] ?? []) as $kind) {

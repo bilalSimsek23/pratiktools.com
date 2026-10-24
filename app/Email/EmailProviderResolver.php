@@ -64,6 +64,11 @@ final class EmailProviderResolver
         return $this->integrations()->first(fn (TenantIntegration $i) => ($i->settings['email_role'] ?? null) === 'secondary');
     }
 
+    public function capabilities(TenantIntegration $integration): EmailCapabilities
+    {
+        return ($this->factories[$integration->provider] ?? null)?->capabilities($integration) ?? new EmailCapabilities;
+    }
+
     public function provider(TenantIntegration $integration, string $purpose, ?Actor $actor = null): EmailProvider
     {
         if ($integration->tenant_id !== $this->context->requireTenant() || $integration->capability !== 'email') {

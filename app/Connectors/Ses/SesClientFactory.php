@@ -4,6 +4,7 @@ namespace App\Connectors\Ses;
 
 use App\Audit\Actor;
 use App\Email\Contracts\EmailProviderFactory;
+use App\Email\EmailCapabilities;
 use App\Email\EmailSendBlocked;
 use App\Email\EmailSendingMode;
 use App\Integrations\Errors\ProviderError;
@@ -67,6 +68,11 @@ class SesClientFactory implements EmailProviderFactory
             (int) $config['base_backoff_ms'],
             app()->bound('ses.sleep') ? app('ses.sleep') : null,
         )), $integration);
+    }
+
+    public function capabilities(TenantIntegration $integration): EmailCapabilities
+    {
+        return SesEmailProvider::capabilitiesFor((array) $integration->settings);
     }
 
     /**
