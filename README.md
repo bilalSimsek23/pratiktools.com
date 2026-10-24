@@ -78,6 +78,15 @@ identity resolution, push eligibility separate from e-mail/SMS consent, and guar
 (`PUSH_SENDING_MODE` off by default, test allowlist, `send_push` scope). See
 [docs/production/onesignal.md](docs/production/onesignal.md).
 
+## E-mail (F4, Amazon SES)
+
+Provider-independent delivery core (`EmailProvider`, capabilities, canonical messages and events)
+with Amazon SES as the first connector: guarded sending (`EMAIL_SENDING_MODE` off by default, test
+allowlist, `send_email` scope, Consent Engine for marketing, suppressions, quota and reputation
+guards), idempotent queue, SNS event ingestion with signature verification, bounce/complaint
+suppression, signed one-click unsubscribe, safe templates and campaign snapshots. See
+[docs/production/ses.md](docs/production/ses.md).
+
 ## Production (Laravel Cloud)
 
 See [docs/production/laravel-cloud.md](docs/production/laravel-cloud.md): boot safety rules, the
