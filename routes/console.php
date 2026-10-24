@@ -5,6 +5,7 @@ use App\Jobs\PlatformHeartbeat;
 use App\Jobs\RecordTenantIntegrationHealth;
 use App\Jobs\ScheduleCommerceSync;
 use App\Jobs\ScheduleConsentSync;
+use App\Jobs\ScheduleOneSignalSync;
 use App\Queue\TenantFanout;
 use Illuminate\Support\Facades\Schedule;
 
@@ -67,4 +68,16 @@ if (config('consent.schedule.enabled')) {
             ->onOneServer()
             ->withoutOverlapping();
     }
+}
+
+/*
+| OneSignal read-only sync. Off unless ONESIGNAL_SYNC_SCHEDULE_ENABLED=true.
+*/
+
+if (config('push.onesignal.sync_schedule_enabled')) {
+    Schedule::call(fn () => app(TenantFanout::class)->dispatch(fn (string $tenantId) => new ScheduleOneSignalSync($tenantId)))
+        ->cron(config('push.onesignal.sync_schedule'))
+        ->name('onesignal-sync')
+        ->onOneServer()
+        ->withoutOverlapping();
 }
