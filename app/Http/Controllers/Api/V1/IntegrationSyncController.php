@@ -11,6 +11,7 @@ use App\Commerce\SyncHealth;
 use App\Http\Controllers\Controller;
 use App\Jobs\SyncCommerceEntity;
 use App\Models\TenantIntegration;
+use App\Push\PushMetrics;
 use App\Tenancy\Permission;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -82,6 +83,16 @@ final class IntegrationSyncController extends Controller
         $this->assertCommerce($integration);
 
         return response()->json(['data' => $preview->sample()]);
+    }
+
+    public function pushMetrics(TenantIntegration $integration, PushMetrics $metrics): JsonResponse
+    {
+        Gate::authorize(Permission::IntegrationsView->value);
+        if ($integration->provider !== 'onesignal') {
+            throw ValidationException::withMessages(['integration' => 'Not a OneSignal integration.']);
+        }
+
+        return response()->json(['data' => $metrics->for($integration)]);
     }
 
     private function assertCommerce(TenantIntegration $integration): void

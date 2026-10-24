@@ -3,6 +3,7 @@
 namespace App\Health;
 
 use App\Jobs\PlatformHeartbeat;
+use App\Push\PushSendingMode;
 use App\Security\Vault\KekMaintenance;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
@@ -35,6 +36,7 @@ class HealthChecker
             'queue' => $this->queue(),
             'scheduler' => $this->scheduler(),
             'vault' => $this->vault(),
+            'onesignal' => $this->onesignal(),
         ];
 
         $failed = collect($checks)->contains(fn (array $c) => $c['status'] === 'fail');
@@ -144,6 +146,36 @@ class HealthChecker
         Cache::put(self::VAULT_CACHE_KEY, $result, $result['status'] === 'ok' ? (int) config('platform.health.kms_cache_seconds') : 30);
 
         return $result + ['cached' => false];
+    }
+
+    /**
+     * Platform-wide view: how many tenants have a OneSignal integration and
+     * how many need attention. Database only, never a provider call; a
+     * provider problem is "warn", never "fail" (it must not take the
+     * application out of rotation).
+     *
+     * @return array<string, mixed>
+     */
+    protected function onesignal(): array
+    {
+        try {
+            $rows = DB::connection('pgsql_platform')->table('tenant_integrations')->where('provider', 'onesignal')
+                ->selectRaw('status, count(*) AS n')->groupBy('status')->pluck('n', 'status')->all();
+        } catch (Throwable $e) {
+            report($e);
+
+            return ['status' => 'warn', 'reason' => 'unavailable'];
+        }
+
+        $total = (int) array_sum($rows);
+        $attention = $total - (int) ($rows['connected'] ?? 0) - (int) ($rows['pending'] ?? 0);
+
+        return [
+            'status' => $total === 0 ? 'not_configured' : ($attention > 0 ? 'warn' : 'ok'),
+            'integrations' => $total,
+            'needing_attention' => $attention,
+            'sending_mode' => PushSendingMode::platform()->value,
+        ];
     }
 
     /**
