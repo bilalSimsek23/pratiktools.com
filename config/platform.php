@@ -165,6 +165,15 @@ return [
             'iys_token' => [
                 'global' => ['capacity' => 8, 'refill_per_second' => 8 / 3600],
             ],
+            // OneSignal view endpoints (app, users, CSV export): 1 request/s
+            // per app; one app per tenant integration.
+            'onesignal_view' => [
+                'tenant' => ['capacity' => 1, 'refill_per_second' => 1],
+            ],
+            // Create message: 150/s/app on free plans. Test pushes are tiny.
+            'onesignal_send' => [
+                'tenant' => ['capacity' => 5, 'refill_per_second' => 2],
+            ],
             // Single status: 1,000 requests per hour per IP (90 % used).
             'iys_status' => [
                 'global' => ['capacity' => 30, 'refill_per_second' => 900 / 3600],

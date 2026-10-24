@@ -24,6 +24,7 @@ final class VerifyDatabaseRoles extends Command
         'customers', 'customer_identities', 'customer_events', 'customer_merges', 'orders', 'order_items', 'carts', 'cart_items',
         'consent_recipients', 'consents', 'consent_events', 'consent_conflicts', 'suppressions', 'recipient_customers',
         'tenant_data_keys', 'users', 'personal_access_tokens',
+        'push_profiles', 'push_subscriptions', 'push_identity_mappings', 'push_suppressions', 'test_recipients', 'push_send_requests',
     ];
 
     /** Tables the platform role may read metadata of, but never these columns. */

@@ -26,4 +26,16 @@ enum AuditAction: string
     case BreakGlassGranted = 'platform.break_glass_granted';
     case SuppressionCreated = 'consent.suppression_created';
     case SuppressionLifted = 'consent.suppression_lifted';
+    case IntegrationScopeChanged = 'integration.scope_changed';
+    case IntegrationSyncStarted = 'integration.sync_started';
+    case IntegrationSyncCompleted = 'integration.sync_completed';
+    case IntegrationSyncFailed = 'integration.sync_failed';
+    case PushTestRecipientAdded = 'push.test_recipient_added';
+    case PushTestRecipientRemoved = 'push.test_recipient_removed';
+    case PushSendRequested = 'push.send_requested';
+    case PushSent = 'push.sent';
+    case PushNotSent = 'push.not_sent';
+    case PushFailed = 'push.failed';
+    case PushBlocked = 'push.blocked';
+    case PushIdentityMappingChanged = 'push.identity_mapping_changed';
 }
