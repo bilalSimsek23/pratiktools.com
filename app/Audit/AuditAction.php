@@ -60,4 +60,17 @@ enum AuditAction: string
     case AutomationArchived = 'automation.archived';
     case AutomationDryRun = 'automation.dry_run';
     case AutomationRunCancelled = 'automation.run_cancelled';
+    case EmailTemplateCreated = 'email.template_created';
+    case EmailTemplatePublished = 'email.template_published';
+    case EmailTemplateArchived = 'email.template_archived';
+    case CampaignCreated = 'campaign.created';
+    case CampaignChanged = 'campaign.changed';
+    case CampaignStateChanged = 'campaign.state_changed';
+    case CampaignAudienceFrozen = 'campaign.audience_frozen';
+    case CampaignDryRun = 'campaign.dry_run';
+    case LeadFormCreated = 'lead_form.created';
+    case LeadFormActivated = 'lead_form.activated';
+    case LeadFormDeactivated = 'lead_form.deactivated';
+    case LeadFormConsentChanged = 'lead_form.consent_text_changed';
+    case CommerceRelinked = 'commerce.relinked';
 }

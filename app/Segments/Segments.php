@@ -149,11 +149,17 @@ final class Segments
     }
 
     /**
-     * Freeze the current members of a segment.
+     * Freeze the current members of a segment. With a purpose key (e.g.
+     * campaign:<id>) the snapshot is unique per purpose: a retry returns
+     * the existing snapshot instead of creating a second one (unique index,
+     * not just an application check).
      */
-    public function snapshot(string $segmentId, Actor $actor): string
+    public function snapshot(string $segmentId, Actor $actor, ?string $purposeKey = null): string
     {
         $tenantId = $this->context->requireTenant();
+        if ($purposeKey !== null && ($existing = DB::table('segment_snapshots')->where('tenant_id', $tenantId)->where('purpose_key', $purposeKey)->value('id')) !== null) {
+            return (string) $existing;
+        }
         $definition = $this->definition($segmentId);
         $id = (string) Str::uuid7();
 
@@ -163,15 +169,17 @@ final class Segments
         // and the snapshot row is never updated afterwards.
         DB::statement(
             "WITH m AS ({$q['sql']}),
-                  snap AS (INSERT INTO segment_snapshots (id, tenant_id, segment_id, definition_hash, definition, member_count, created_by, created_at)
-                           SELECT ?, ?, ?, ?, ?::jsonb, (SELECT count(*) FROM m), ?, now() RETURNING id)
-             INSERT INTO segment_snapshot_members (tenant_id, snapshot_id, customer_id) SELECT ?, (SELECT id FROM snap), m.id FROM m",
-            [...$q['bindings'], $id, $tenantId, $segmentId, hash('sha256', $json), $json, self::by($actor), $tenantId],
+                  snap AS (INSERT INTO segment_snapshots (id, tenant_id, segment_id, definition_hash, definition, member_count, created_by, created_at, purpose_key)
+                           SELECT ?, ?, ?, ?, ?::jsonb, (SELECT count(*) FROM m), ?, now(), ? ON CONFLICT (tenant_id, purpose_key) DO NOTHING RETURNING id)
+             INSERT INTO segment_snapshot_members (tenant_id, snapshot_id, customer_id) SELECT ?, snap.id, m.id FROM m CROSS JOIN snap",
+            [...$q['bindings'], $id, $tenantId, $segmentId, hash('sha256', $json), $json, self::by($actor), $purposeKey, $tenantId],
         );
-        $count = (int) DB::table('segment_snapshots')->where('tenant_id', $tenantId)->where('id', $id)->value('member_count');
-        $this->audit->record(AuditAction::SegmentSnapshotCreated, 'segment_snapshot', $id, ['segment_id' => $segmentId, 'members' => $count], $actor);
+        $row = DB::table('segment_snapshots')->where('tenant_id', $tenantId)->where($purposeKey === null ? 'id' : 'purpose_key', $purposeKey ?? $id)->first(['id', 'member_count']);
+        if ((string) $row->id === $id) {
+            $this->audit->record(AuditAction::SegmentSnapshotCreated, 'segment_snapshot', $id, ['segment_id' => $segmentId, 'members' => (int) $row->member_count, 'purpose' => $purposeKey], $actor);
+        }
 
-        return $id;
+        return (string) $row->id;
     }
 
     public function snapshotCount(string $snapshotId): int
