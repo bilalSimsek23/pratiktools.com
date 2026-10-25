@@ -52,9 +52,12 @@ final class EmailTemplatesTest extends TestCase
             $templates = app(EmailTemplates::class);
             $id = $templates->create('Kasım kampanyası', EmailMessageType::Marketing, Actor::system());
 
-            return $templates->addVersion($id, $subject,
+            $version = $templates->addVersion($id, $subject,
                 '<p>Merhaba {{ customer.first_name | default: "Değerli müşterimiz" }}, kod: {{ coupon.code }}</p><a href="{{ unsubscribe_url }}">Çık</a>',
                 "Merhaba {{ customer.first_name | default: \"Değerli müşterimiz\" }}\nKod: {{ coupon.code }}\nÇıkış: {{ unsubscribe_url }}", Actor::system());
+            $templates->publish($version, Actor::system());
+
+            return $version;
         });
     }
 

@@ -76,8 +76,8 @@ final class CampaignPreparation
         $snapshot = DB::table('email_audience_snapshots')->where('tenant_id', $tenantId)->where('id', $snapshotId)->first()
             ?? throw new InvalidEmailMessage('UNKNOWN_SNAPSHOT', 'Unknown audience snapshot.');
         $version = $this->templates->version($templateVersionId);
-        if ($version->message_type !== EmailMessageType::Marketing->value) {
-            throw new TemplateError('INVALID_TEMPLATE', 'Campaigns use marketing templates.');
+        if ($version->message_type !== EmailMessageType::Marketing->value || $version->status !== 'published') {
+            throw new TemplateError('INVALID_TEMPLATE', 'Campaigns use published marketing templates.');
         }
         $store = $this->store($tenantId);
         $result = ['queued' => 0, 'duplicates' => 0, 'excluded' => []];

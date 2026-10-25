@@ -63,7 +63,7 @@ return [
             'product.name', 'product.url', 'product.image_url', 'product.price',
             'coupon.code', 'coupon.expires_at',
             'store.name', 'store.url',
-            'unsubscribe_url', 'current_year',
+            'unsubscribe_url', 'current_year', 'campaign.name',
         ],
         // Variables that must be https URLs; rendered URL-safe.
         'url_variables' => ['product.url', 'product.image_url', 'store.url', 'unsubscribe_url'],
