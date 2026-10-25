@@ -24,6 +24,17 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware('web')
                 ->domain(config('platform.admin_domain'))
                 ->group(base_path('routes/admin.php'));
+
+            // Tenant marketing panel (session + CSRF), never on the admin host.
+            Route::middleware(['web', RejectAdminHost::class])
+                ->prefix('app')
+                ->name('panel.')
+                ->group(base_path('routes/panel.php'));
+
+            // Product root: the panel (login when signed out, dashboard when signed in).
+            Route::middleware(['web', RejectAdminHost::class])
+                ->get('/', fn () => redirect()->route('panel.dashboard'))
+                ->name('home');
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -39,7 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // tenant-scoped models.
         $middleware->prependToPriorityList(SubstituteBindings::class, ResolveTenantContext::class);
 
-        $middleware->redirectGuestsTo(fn (Request $request) => $request->expectsJson() ? null : route('admin.login'));
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->expectsJson() ? null : ($request->is('app', 'app/*') ? route('panel.login') : route('admin.login')));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -30,6 +30,16 @@ final class SecurityHeaders
         $headers->set('Cross-Origin-Opener-Policy', 'same-origin');
         $headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
 
+        // Sanitized e-mail previews: framed only by our own pages, no scripts,
+        // no forms, no network except https images (sandboxed iframe).
+        if ($headers->has('X-Panel-Preview-Frame')) {
+            $headers->remove('X-Panel-Preview-Frame');
+            $headers->set('X-Frame-Options', 'SAMEORIGIN');
+            $headers->set('Content-Security-Policy', "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; font-src https:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox");
+
+            return $response;
+        }
+
         $isHtml = str_contains((string) $headers->get('Content-Type'), 'text/html');
         $headers->set('Content-Security-Policy', $isHtml
             ? "default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self' 'nonce-{$nonce}'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
