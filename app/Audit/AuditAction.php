@@ -50,4 +50,14 @@ enum AuditAction: string
     case EmailUnsubscribed = 'email.unsubscribed';
     case EmailTemplateVersionCreated = 'email.template_version_created';
     case EmailAudienceSnapshotCreated = 'email.audience_snapshot_created';
+    case SegmentCreated = 'segment.created';
+    case SegmentSnapshotCreated = 'segment.snapshot_created';
+    case AutomationCreated = 'automation.created';
+    case AutomationChanged = 'automation.changed';
+    case AutomationPublished = 'automation.published';
+    case AutomationPaused = 'automation.paused';
+    case AutomationResumed = 'automation.resumed';
+    case AutomationArchived = 'automation.archived';
+    case AutomationDryRun = 'automation.dry_run';
+    case AutomationRunCancelled = 'automation.run_cancelled';
 }
