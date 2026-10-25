@@ -105,6 +105,16 @@ F5 `newsletter_subscribed` trigger, and a local commerce relink. See
 [docs/production/campaigns-and-leads.md](docs/production/campaigns-and-leads.md) and
 [docs/production/onesignal-identity-remediation.md](docs/production/onesignal-identity-remediation.md).
 
+## Marketing operations panel (F7)
+
+A server-rendered panel at `/` → `/app` (session login, CSRF, nonce CSP, role-based
+navigation) for campaigns, segments, templates, automations, lead forms, approvals,
+dispatch, integrations, readiness, suppressions and settings. Campaign approvals bind
+to the frozen campaign (two-person rule, creator/requester never approve, any change
+invalidates); dispatch is test-only to the allowlist, planned without provider calls,
+idempotent, and guarded again before the provider. Live sending is hard-blocked. See
+[docs/production/operations-panel.md](docs/production/operations-panel.md).
+
 ## Production (Laravel Cloud)
 
 See [docs/production/laravel-cloud.md](docs/production/laravel-cloud.md): boot safety rules, the
