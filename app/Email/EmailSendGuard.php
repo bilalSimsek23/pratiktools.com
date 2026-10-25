@@ -4,6 +4,7 @@ namespace App\Email;
 
 use App\Consent\ConsentChannel;
 use App\Consent\SendEligibility;
+use App\Messaging\FrequencyCap;
 use App\Models\TenantIntegration;
 use App\Models\TenantSetting;
 use App\Tenancy\TenantContext;
@@ -38,6 +39,7 @@ final class EmailSendGuard
         private readonly SendEligibility $eligibility,
         private readonly EmailProviderResolver $providers,
         private readonly UnsubscribeTokens $unsubscribe,
+        private readonly FrequencyCap $frequency,
     ) {}
 
     public function mode(): EmailSendingMode
@@ -157,10 +159,7 @@ final class EmailSendGuard
             throw new EmailSendBlocked('UNSUBSCRIBE_MISSING', 'Marketing mail needs a one-click unsubscribe header.');
         }
 
-        $cap = (array) config('email.guardrails.frequency_cap');
-        $recent = fn (int $hours) => DB::table('email_messages')->where('tenant_id', $this->context->requireTenant())->where('recipient_id', $message->recipient_id)
-            ->where('message_type', 'marketing')->where('status', 'sent')->where('sent_at', '>=', now()->subHours($hours))->count();
-        if ($recent(24) >= (int) $cap['per_day'] || $recent(24 * 7) >= (int) $cap['per_week']) {
+        if ($this->frequency->exceeded('email', (string) $message->recipient_id)) {
             throw new EmailSendBlocked('FREQUENCY_CAP', 'The recipient reached the marketing frequency cap.');
         }
 
