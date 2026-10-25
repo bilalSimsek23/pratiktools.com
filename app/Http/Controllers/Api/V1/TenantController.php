@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Audit\Actor;
 use App\Audit\AuditAction;
 use App\Audit\AuditLogger;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TenantResource;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
+use App\Operations\SendingModes;
 use App\Tenancy\Permission;
 use App\Tenancy\TenantContext;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -29,7 +32,7 @@ final class TenantController extends Controller
         return new TenantResource($this->current());
     }
 
-    public function updateSettings(Request $request): TenantResource
+    public function updateSettings(Request $request): TenantResource|JsonResponse
     {
         Gate::authorize(Permission::SettingsUpdate->value);
 
@@ -54,6 +57,13 @@ final class TenantController extends Controller
 
         if (array_key_exists('sending_mode', $data)) {
             Gate::authorize(Permission::SendingModeUpdate->value);
+            // Only off / internal (test only); live and pilot are refused and audited.
+            try {
+                app(SendingModes::class)->set((string) $data['sending_mode'], Actor::user((string) $request->user()?->getAuthIdentifier()));
+            } catch (\InvalidArgumentException $e) {
+                return response()->json(['message' => $e->getMessage(), 'errors' => ['sending_mode' => [SendingModes::LIVE_DISABLED_REASON]]], 422);
+            }
+            unset($data['sending_mode']);
         }
 
         $tenant = $this->current();

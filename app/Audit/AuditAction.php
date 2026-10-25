@@ -7,6 +7,8 @@ enum AuditAction: string
     case TenantCreated = 'tenant.created';
     case TenantSettingsUpdated = 'tenant.settings_updated';
     case MemberRoleChanged = 'member.role_changed';
+    case MemberAdded = 'member.added';
+    case MemberStatusChanged = 'member.status_changed';
     case IntegrationCreated = 'integration.created';
     case IntegrationSecretCreated = 'integration.secret_created';
     case IntegrationSecretChanged = 'integration.secret_changed';
@@ -73,4 +75,21 @@ enum AuditAction: string
     case LeadFormDeactivated = 'lead_form.deactivated';
     case LeadFormConsentChanged = 'lead_form.consent_text_changed';
     case CommerceRelinked = 'commerce.relinked';
+    case CampaignApprovalRequested = 'campaign.approval_requested';
+    case CampaignApproved = 'campaign.approved';
+    case CampaignRejected = 'campaign.rejected';
+    case CampaignApprovalsInvalidated = 'campaign.approvals_invalidated';
+    case CampaignReopened = 'campaign.reopened';
+    case DispatchRequested = 'dispatch.requested';
+    case DispatchApproved = 'dispatch.approved';
+    case DispatchQueued = 'dispatch.queued';
+    case DispatchCancelled = 'dispatch.cancelled';
+    case DispatchBlocked = 'dispatch.blocked';
+    case TestEmailQueued = 'dispatch.test_email_queued';
+    case TestPushQueued = 'dispatch.test_push_queued';
+    case SendingModeChanged = 'tenant.sending_mode_changed';
+    case SendingModeChangeRefused = 'tenant.sending_mode_change_refused';
+    case PanelLogin = 'panel.login';
+    case PanelLoginFailed = 'panel.login_failed';
+    case PanelReauthenticated = 'panel.reauthenticated';
 }

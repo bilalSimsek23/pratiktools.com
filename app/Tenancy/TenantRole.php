@@ -8,6 +8,8 @@ enum TenantRole: string
     case Admin = 'admin';
     case Marketer = 'marketer';
     case Viewer = 'viewer';
+    // Decides campaign approvals; cannot create, edit or dispatch.
+    case Approver = 'approver';
 
     public function allows(Permission $permission): bool
     {
@@ -39,6 +41,14 @@ enum TenantRole: string
             self::Viewer => [
                 Permission::TenantView,
                 Permission::CustomersView,
+            ],
+            self::Approver => [
+                Permission::TenantView,
+                Permission::CampaignsView,
+                Permission::CampaignsApprove,
+                Permission::AutomationsView,
+                Permission::IntegrationsView,
+                Permission::LeadsView,
             ],
         };
     }

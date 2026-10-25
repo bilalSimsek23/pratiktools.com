@@ -42,4 +42,9 @@ enum Permission: string
     case FormsManage = 'forms.manage';
     // Aggregate lead reports only (no addresses).
     case LeadsView = 'leads.view';
+    // Decide campaign approvals (never one's own campaign).
+    case CampaignsApprove = 'campaigns.approve';
+    // Queue test-only dispatches to allowlisted recipients.
+    case CampaignsTestDispatch = 'campaigns.test_dispatch';
+    case SuppressionsView = 'suppressions.view';
 }

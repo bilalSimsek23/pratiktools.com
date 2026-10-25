@@ -29,6 +29,7 @@ final class VerifyDatabaseRoles extends Command
         'email_messages', 'email_events', 'email_unsubscribes', 'email_usage_daily', 'consent_write_intents',
         'segments', 'segment_snapshots', 'segment_snapshot_members', 'automation_versions', 'automation_runs', 'automation_run_steps',
         'automation_planned_actions', 'automation_trigger_cursors', 'lead_forms', 'lead_submissions',
+        'campaign_approvals', 'tenant_notifications',
     ];
 
     /** Tables the platform role may read metadata of, but never these columns. */
@@ -37,6 +38,8 @@ final class VerifyDatabaseRoles extends Command
         'tenant_integrations' => ['encrypted_secret', 'settings'],
         // audit metadata is readable by design and must stay free of PII (redaction tests).
         'audit_logs' => ['ip_hash', 'user_agent_hash'],
+        // Platform sees dispatch counts only, never recipients or content.
+        'campaign_dispatches' => ['recipients', 'content', 'plan', 'requested_by', 'cancelled_by', 'block_reason'],
     ];
 
     /**

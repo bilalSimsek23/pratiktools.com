@@ -2,6 +2,7 @@
 
 namespace App\Campaigns;
 
+use App\Approvals\CampaignApprovals;
 use App\Audit\Actor;
 use App\Audit\AuditAction;
 use App\Audit\AuditLogger;
@@ -28,6 +29,7 @@ final class Campaigns
         private readonly TenantContext $context,
         private readonly Segments $segments,
         private readonly CampaignReadiness $readiness,
+        private readonly CampaignApprovals $approvals,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -56,7 +58,11 @@ final class Campaigns
                 throw new CampaignError('NOT_EDITABLE', 'Only draft campaigns can be edited.');
             }
             $values = $this->validate($attributes + (array) $campaign, false);
+            // The freeze generation is system state, never user input.
+            $stored = (array) json_decode((string) $campaign->settings, true);
+            $values['settings'] = json_encode((object) ((array) json_decode($values['settings'], true) + array_intersect_key($stored, ['reopen_count' => true])));
             DB::table('campaigns')->where('tenant_id', $campaign->tenant_id)->where('id', $campaignId)->update($values + ['updated_at' => now()]);
+            $this->approvals->invalidateStale($this->find($campaignId), $actor);
             $this->audit->record(AuditAction::CampaignChanged, 'campaign', $campaignId, ['fields' => array_values(array_intersect(array_keys($attributes), self::EDITABLE))], $actor);
         });
     }
@@ -82,7 +88,9 @@ final class Campaigns
                 }
             }
             if ($to === CampaignStatus::Ready) {
-                $snapshot = $campaign->segment_snapshot_id ?? $this->segments->snapshot((string) $campaign->segment_id, $actor, "campaign:{$campaignId}");
+                // One snapshot per freeze generation: a retry reuses it, a reopen starts a new one.
+                $reopens = (int) (json_decode((string) $campaign->settings, true)['reopen_count'] ?? 0);
+                $snapshot = $campaign->segment_snapshot_id ?? $this->segments->snapshot((string) $campaign->segment_id, $actor, "campaign:{$campaignId}".($reopens > 0 ? ":r{$reopens}" : ''));
                 $values += ['segment_snapshot_id' => $snapshot, 'frozen_at' => now(), 'published_by' => self::by($actor)];
                 $this->audit->record(AuditAction::CampaignAudienceFrozen, 'campaign', $campaignId, ['snapshot_id' => $snapshot, 'members' => $this->segments->snapshotCount($snapshot)], $actor);
             }
@@ -94,11 +102,55 @@ final class Campaigns
             }
 
             DB::table('campaigns')->where('tenant_id', $campaign->tenant_id)->where('id', $campaignId)->update($values);
+            if (in_array($to, [CampaignStatus::Cancelled, CampaignStatus::Archived], true)) {
+                $this->approvals->invalidateStale($campaign, $actor, all: true, reason: 'campaign_'.$to->value);
+                $this->cancelOpenDispatches($campaign, $actor, 'campaign_'.$to->value);
+            }
             $this->audit->record(AuditAction::CampaignStateChanged, 'campaign', $campaignId, ['from' => $from->value, 'to' => $to->value,
                 'blocked' => array_values(array_map(fn ($c) => $c['reason'], array_filter($readiness['checks'], fn ($c) => $c['status'] === 'BLOCKED')))], $actor);
 
             return $readiness;
         });
+    }
+
+    /**
+     * Back to draft for changes: unfreezes audience, content and sender (the
+     * only path that may change them) and invalidates every approval.
+     * Allowed only from ready (never once scheduled).
+     */
+    public function reopen(string $campaignId, Actor $actor): void
+    {
+        DB::transaction(function () use ($campaignId, $actor) {
+            $campaign = $this->lock($campaignId);
+            if ($campaign->status !== CampaignStatus::Ready->value) {
+                throw new CampaignError('INVALID_TRANSITION', 'Only a ready campaign can be reopened.');
+            }
+            if (DB::table('campaign_dispatches')->where('tenant_id', $campaign->tenant_id)->where('campaign_id', $campaignId)->whereIn('status', ['queued', 'running'])->exists()) {
+                throw new CampaignError('DISPATCH_ACTIVE', 'A dispatch is in progress.');
+            }
+            DB::table('campaigns')->where('tenant_id', $campaign->tenant_id)->where('id', $campaignId)->update([
+                'status' => CampaignStatus::Draft->value, 'frozen_at' => null, 'published_by' => null, 'updated_at' => now(),
+                'segment_snapshot_id' => $campaign->audience_source === 'segment' ? null : $campaign->segment_snapshot_id,
+                'settings' => json_encode(['reopen_count' => (int) (json_decode((string) $campaign->settings, true)['reopen_count'] ?? 0) + 1] + (array) json_decode((string) $campaign->settings, true)),
+            ]);
+            $this->approvals->invalidateStale($campaign, $actor, all: true, reason: 'campaign_reopened');
+            $this->cancelOpenDispatches($campaign, $actor, 'campaign_reopened');
+            $this->audit->record(AuditAction::CampaignReopened, 'campaign', $campaignId, [], $actor);
+        });
+    }
+
+    /**
+     * Dispatches not yet queued end with the campaign state they belonged to.
+     */
+    private function cancelOpenDispatches(object $campaign, Actor $actor, string $reason): void
+    {
+        $open = DB::table('campaign_dispatches')->where('tenant_id', $campaign->tenant_id)->where('campaign_id', $campaign->id)
+            ->whereIn('status', ['draft', 'awaiting_approval', 'approved', 'blocked', 'failed'])->lockForUpdate()->pluck('id');
+        foreach ($open as $id) {
+            DB::table('campaign_dispatches')->where('tenant_id', $campaign->tenant_id)->where('id', $id)
+                ->update(['status' => 'cancelled', 'block_reason' => mb_substr($reason, 0, 64), 'updated_at' => now()]);
+            $this->audit->record(AuditAction::DispatchCancelled, 'campaign_dispatch', (string) $id, ['reason' => $reason], $actor);
+        }
     }
 
     public function find(string $campaignId): object
