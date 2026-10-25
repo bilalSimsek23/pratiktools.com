@@ -48,6 +48,8 @@ final class ScheduleCommerceSync implements ShouldQueue
 
         if ($this->rebuildStats && $integrations->isNotEmpty()) {
             RebuildCustomerStats::dispatch($this->tenantId);
+            // Links rows written before their product/member existed.
+            RelinkCommerceData::dispatch($this->tenantId);
         }
     }
 }

@@ -5,6 +5,7 @@ namespace Tests\Feature\Commerce;
 use App\Commerce\Sync\SyncEntity;
 use App\Commerce\Sync\SyncMode;
 use App\Jobs\RebuildCustomerStats;
+use App\Jobs\RelinkCommerceData;
 use App\Jobs\ScheduleCommerceSync;
 use App\Jobs\SyncCommerceEntity;
 use App\Models\Tenant;
@@ -175,12 +176,13 @@ final class CommerceApiAndJobsTest extends TestCase
         $events = collect(app(Schedule::class)->events())->map->description->filter()->values()->all();
         $this->assertNotContains('commerce-sync-orders', $events);
 
-        Queue::fake([SyncCommerceEntity::class, RebuildCustomerStats::class]);
+        Queue::fake([SyncCommerceEntity::class, RebuildCustomerStats::class, RelinkCommerceData::class]);
         dispatch_sync(new ScheduleCommerceSync(['orders' => SyncMode::Delta, 'products' => SyncMode::Full], ['orders' => 7], rebuildStats: true, tenantId: $this->tenant->id));
 
         Queue::assertPushed(SyncCommerceEntity::class, fn ($job) => $job->entity === SyncEntity::Orders && $job->lookbackDays === 7 && $job->tenantId === $this->tenant->id);
         Queue::assertPushed(SyncCommerceEntity::class, fn ($job) => $job->entity === SyncEntity::Products && $job->mode === SyncMode::Full);
         Queue::assertPushed(RebuildCustomerStats::class);
+        Queue::assertPushed(RelinkCommerceData::class);
     }
 
     public function test_commands_connect_test_sync_and_report_without_printing_secrets(): void
