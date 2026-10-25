@@ -81,7 +81,8 @@ final class PlatformFoundationTest extends TestCase
 
     public function test_no_debug_or_default_routes_are_exposed(): void
     {
-        $this->get('/')->assertNotFound();
+        // F7: the root is the panel entry (login or dashboard), never the framework welcome page.
+        $this->get('/')->assertRedirect(route('panel.dashboard'))->assertDontSee('Laravel');
         $this->get('/up')->assertNotFound();
         $this->get('/_debugbar')->assertNotFound();
         $this->get('/telescope')->assertNotFound();
