@@ -87,6 +87,14 @@ guards), idempotent queue, SNS event ingestion with signature verification, boun
 suppression, signed one-click unsubscribe, safe templates and campaign snapshots. See
 [docs/production/ses.md](docs/production/ses.md).
 
+## Automations and segments (F5)
+
+Tenant segments (whitelisted JSON rule DSL compiled to parameterized SQL, read-only previews,
+immutable snapshots) and an automation engine (versioned workflows, event and time triggers,
+persistent delays, atomic claims, database-enforced idempotency). Email/push steps only record
+planned actions after re-checking consent, suppression and frequency at action time; nothing is
+sent. See [docs/production/automation.md](docs/production/automation.md).
+
 ## Production (Laravel Cloud)
 
 See [docs/production/laravel-cloud.md](docs/production/laravel-cloud.md): boot safety rules, the
