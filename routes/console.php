@@ -3,6 +3,7 @@
 use App\Commerce\Sync\SyncMode;
 use App\Jobs\PlatformHeartbeat;
 use App\Jobs\RecordTenantIntegrationHealth;
+use App\Jobs\RunAutomationTick;
 use App\Jobs\ScheduleCommerceSync;
 use App\Jobs\ScheduleConsentSync;
 use App\Jobs\ScheduleOneSignalSync;
@@ -78,6 +79,19 @@ if (config('push.onesignal.sync_schedule_enabled')) {
     Schedule::call(fn () => app(TenantFanout::class)->dispatch(fn (string $tenantId) => new ScheduleOneSignalSync($tenantId)))
         ->cron(config('push.onesignal.sync_schedule'))
         ->name('onesignal-sync')
+        ->onOneServer()
+        ->withoutOverlapping();
+}
+
+/*
+| Automations (planned actions only, never sends). Off unless
+| AUTOMATION_SCHEDULE_ENABLED=true. One bounded tick per tenant per minute.
+*/
+
+if (config('automation.schedule_enabled')) {
+    Schedule::call(fn () => app(TenantFanout::class)->dispatch(fn (string $tenantId) => new RunAutomationTick($tenantId)))
+        ->everyMinute()
+        ->name('automation-tick')
         ->onOneServer()
         ->withoutOverlapping();
 }
