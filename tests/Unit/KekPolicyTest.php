@@ -78,6 +78,16 @@ final class KekPolicyTest extends TestCase
         }
     }
 
+    public function test_every_key_in_the_ci_workflow_is_a_known_test_key(): void
+    {
+        preg_match_all('/^\s+([A-Z_]+): "(?:base64:)?([A-Za-z0-9+\/]{43}=)"/m', (string) file_get_contents(__DIR__.'/../../.github/workflows/ci.yml'), $m, PREG_SET_ORDER);
+        $this->assertCount(4, $m, 'APP_KEY, SECRET_VAULT_LOCAL_KEK, SECRET_VAULT_FINGERPRINT_KEY, AUDIT_HASH_KEY');
+
+        foreach ($m as [, $name, $value]) {
+            $this->assertContains(hash('sha256', (string) base64_decode($value, true)), KekPolicy::KNOWN_TEST_KEY_HASHES, "{$name} from ci.yml must be a known test key");
+        }
+    }
+
     public function test_kek_ids_are_derived_deterministically_and_reveal_nothing(): void
     {
         $raw = random_bytes(32);

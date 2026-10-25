@@ -45,6 +45,17 @@ jobs:
       DB_PLATFORM_PASSWORD: ci_platform_password
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: 6379
+      # Public, test-only keys for the artisan steps (phpunit.xml sets the
+      # same values for the test suites). Never real secrets: every value is
+      # listed in KekPolicy::KNOWN_TEST_KEY_HASHES, so production refuses
+      # them, and production refuses the local KEK driver altogether.
+      APP_KEY: "base64:dGVzdGluZy1vbmx5LWFwcC1rZXktbm90LXNlY3JldDA="
+      SECRET_VAULT_KEK_DRIVER: local
+      SECRET_VAULT_LOCAL_KEK_ID: local-test-v1
+      SECRET_VAULT_LOCAL_KEK: "dGVzdGluZy1vbmx5LWtlay1ub3QtYS1zZWNyZXQtMDE="
+      SECRET_VAULT_LOCAL_PREVIOUS_KEKS: ""
+      SECRET_VAULT_FINGERPRINT_KEY: "dGVzdGluZy1maW5nZXJwcmludC1rZXktMDAwMDAwMDE="
+      AUDIT_HASH_KEY: "dGVzdGluZy1hdWRpdC1oYXNoLWtleS0wMDAwMDAwMDE="
 
     steps:
       - uses: actions/checkout@v4
