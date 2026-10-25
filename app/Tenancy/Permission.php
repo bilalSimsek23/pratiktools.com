@@ -33,4 +33,13 @@ enum Permission: string
     case AuditView = 'audit.view';
     case AutomationsView = 'automations.view';
     case AutomationsManage = 'automations.manage';
+    case CampaignsView = 'campaigns.view';
+    case CampaignsManage = 'campaigns.manage';
+    // ready / schedule / pause / cancel / archive
+    case CampaignsPublish = 'campaigns.publish';
+    case ContentManage = 'content.manage';
+    case ContentPublish = 'content.publish';
+    case FormsManage = 'forms.manage';
+    // Aggregate lead reports only (no addresses).
+    case LeadsView = 'leads.view';
 }

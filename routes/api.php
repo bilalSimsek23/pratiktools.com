@@ -3,10 +3,13 @@
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\AutomationController;
+use App\Http\Controllers\Api\V1\CampaignController;
 use App\Http\Controllers\Api\V1\ConsentController;
+use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\IntegrationController;
 use App\Http\Controllers\Api\V1\IntegrationSyncController;
+use App\Http\Controllers\Api\V1\LeadFormController;
 use App\Http\Controllers\Api\V1\MemberController;
 use App\Http\Controllers\Api\V1\TenantController;
 use Illuminate\Support\Facades\Route;
@@ -54,5 +57,27 @@ Route::prefix('v1')->group(function () {
         Route::get('automations', [AutomationController::class, 'index']);
         Route::get('automations/{automation}', [AutomationController::class, 'show'])->whereUuid('automation');
         Route::post('automations/{automation}/dry-run', [AutomationController::class, 'dryRun'])->whereUuid('automation')->middleware('throttle:6,1');
+
+        Route::get('campaigns', [CampaignController::class, 'index']);
+        Route::post('campaigns', [CampaignController::class, 'store']);
+        Route::get('campaigns/{campaign}', [CampaignController::class, 'show'])->whereUuid('campaign');
+        Route::patch('campaigns/{campaign}', [CampaignController::class, 'update'])->whereUuid('campaign');
+        Route::post('campaigns/{campaign}/transition', [CampaignController::class, 'transition'])->whereUuid('campaign');
+        Route::get('campaigns/{campaign}/audience', [CampaignController::class, 'audience'])->whereUuid('campaign')->middleware('throttle:12,1');
+        Route::post('campaigns/{campaign}/dry-run', [CampaignController::class, 'dryRun'])->whereUuid('campaign')->middleware('throttle:6,1');
+
+        Route::get('email-templates', [ContentController::class, 'templates']);
+        Route::post('email-templates', [ContentController::class, 'createTemplate']);
+        Route::post('email-templates/{template}/versions', [ContentController::class, 'addVersion'])->whereUuid('template');
+        Route::post('email-templates/{template}/archive', [ContentController::class, 'archive'])->whereUuid('template');
+        Route::post('email-template-versions/{version}/publish', [ContentController::class, 'publish'])->whereUuid('version');
+        Route::get('email-template-versions/{version}/preview', [ContentController::class, 'preview'])->whereUuid('version');
+        Route::get('email-senders', [ContentController::class, 'senders']);
+
+        Route::get('lead-forms', [LeadFormController::class, 'index']);
+        Route::post('lead-forms', [LeadFormController::class, 'store']);
+        Route::post('lead-forms/{form}/active', [LeadFormController::class, 'setActive'])->whereUuid('form');
+        Route::put('lead-forms/{form}/consent-text', [LeadFormController::class, 'consentText'])->whereUuid('form');
+        Route::get('leads/report', [LeadFormController::class, 'report']);
     });
 });

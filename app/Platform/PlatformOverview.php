@@ -37,11 +37,18 @@ final class PlatformOverview
             ->selectRaw('tenant_id, sum(runs_started) AS runs_started, sum(planned_email) AS planned_email, sum(planned_push) AS planned_push, sum(consent_blocked) AS consent_blocked')
             ->groupBy('tenant_id')->get()->keyBy('tenant_id');
 
+        $campaigns = $db->table('campaigns')->selectRaw('tenant_id, status, count(*) AS n')->groupBy('tenant_id', 'status')->get()->groupBy('tenant_id');
+        $leads = $db->table('lead_metrics_daily')->where('day', '>=', now()->subDays(7)->toDateString())
+            ->selectRaw('tenant_id, sum(submissions) AS submissions, sum(accepted) AS accepted, sum(invalid) AS invalid, sum(bot_suspected) AS bot_suspected, sum(rate_limited) AS rate_limited')
+            ->groupBy('tenant_id')->get()->keyBy('tenant_id');
+
         return $db->table('tenants')
             ->select('id', 'name', 'slug', 'status', 'country', 'timezone', 'currency', 'created_at')
             ->orderBy('created_at')
             ->get()
-            ->map(function (object $tenant) use ($integrations, $members, $automations, $planned) {
+            ->map(function (object $tenant) use ($integrations, $members, $automations, $planned, $campaigns, $leads) {
+                $tenant->campaigns = ($campaigns[$tenant->id] ?? collect())->pluck('n', 'status')->map(fn ($n) => (int) $n)->all();
+                $tenant->leads_7d = array_map('intval', (array) ($leads[$tenant->id] ?? ['submissions' => 0, 'accepted' => 0, 'invalid' => 0, 'bot_suspected' => 0, 'rate_limited' => 0]));
                 $tenant->members = (int) ($members[$tenant->id] ?? 0);
                 $tenant->integrations = ($integrations[$tenant->id] ?? collect())->values()->all();
                 $tenant->automations = ['published' => (int) ($automations[$tenant->id]->published ?? 0), 'total' => (int) ($automations[$tenant->id]->total ?? 0)];
