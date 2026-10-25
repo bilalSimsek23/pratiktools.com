@@ -95,6 +95,16 @@ persistent delays, atomic claims, database-enforced idempotency). Email/push ste
 planned actions after re-checking consent, suppression and frequency at action time; nothing is
 sent. See [docs/production/automation.md](docs/production/automation.md).
 
+## Campaigns, content and lead capture (F6)
+
+Campaigns on F5 segments/snapshots with immutable F4 template versions (sanitized HTML, safe
+variables, preview = send pipeline), a single readiness service with machine-readable blockers
+(no dispatcher yet), a public lead/newsletter API (`/public/v1/forms/{id}/subscribe`: per-form
+origins, honeypot, rate limits, idempotent, no enumeration, store-side consent only) feeding the
+F5 `newsletter_subscribed` trigger, and a local commerce relink. See
+[docs/production/campaigns-and-leads.md](docs/production/campaigns-and-leads.md) and
+[docs/production/onesignal-identity-remediation.md](docs/production/onesignal-identity-remediation.md).
+
 ## Production (Laravel Cloud)
 
 See [docs/production/laravel-cloud.md](docs/production/laravel-cloud.md): boot safety rules, the
