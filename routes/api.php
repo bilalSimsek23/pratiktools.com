@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\AutomationController;
 use App\Http\Controllers\Api\V1\ConsentController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\IntegrationController;
@@ -49,5 +50,9 @@ Route::prefix('v1')->group(function () {
         Route::get('customers/{customer}/eligibility', [ConsentController::class, 'eligibility']);
 
         Route::get('audit-logs', [AuditLogController::class, 'index']);
+
+        Route::get('automations', [AutomationController::class, 'index']);
+        Route::get('automations/{automation}', [AutomationController::class, 'show'])->whereUuid('automation');
+        Route::post('automations/{automation}/dry-run', [AutomationController::class, 'dryRun'])->whereUuid('automation')->middleware('throttle:6,1');
     });
 });

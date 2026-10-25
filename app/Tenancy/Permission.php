@@ -31,4 +31,6 @@ enum Permission: string
     case IntegrationsManage = 'integrations.manage';
     case CustomersView = 'customers.view';
     case AuditView = 'audit.view';
+    case AutomationsView = 'automations.view';
+    case AutomationsManage = 'automations.manage';
 }

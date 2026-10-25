@@ -30,6 +30,7 @@ enum TenantRole: string
                 Permission::MembersView,
                 Permission::IntegrationsView,
                 Permission::CustomersView,
+                Permission::AutomationsView,
             ],
             self::Viewer => [
                 Permission::TenantView,
