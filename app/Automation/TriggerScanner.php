@@ -135,7 +135,8 @@ final class TriggerScanner
                     'ref' => (string) $row->source_event_id, 'customer_id' => $customer, 'scope' => $scope, 'context' => ['order_id' => $props['order_id'] ?? null],
                 ],
             $type === TriggerType::CustomerCreated && $row->name === 'CUSTOMER_CREATED' && ($props['source_kind'] ?? null) === 'member',
-            $type === TriggerType::NewsletterSubscribed && $row->name === 'CUSTOMER_CREATED' && ($props['source_kind'] ?? null) === 'subscriber' => [
+            $type === TriggerType::NewsletterSubscribed && $row->name === 'CUSTOMER_CREATED' && ($props['source_kind'] ?? null) === 'subscriber',
+            $type === TriggerType::NewsletterSubscribed && $row->name === 'NEWSLETTER_SUBSCRIBED' => [
                 'ref' => (string) $row->source_event_id, 'customer_id' => $customer, 'scope' => $scope, 'context' => [],
             ],
             $type === TriggerType::ConsentChanged && $source === 'consent_events'
@@ -168,9 +169,13 @@ final class TriggerScanner
 
         return match ($source) {
             'customer_events' => DB::select(
-                "SELECT id, name, customer_id, occurred_at, source_event_id, is_backfill, properties FROM customer_events
-                 WHERE tenant_id = ? AND id > ? AND name IN ('CART_UPDATED', 'ORDER_PLACED', 'ORDER_STATUS_CHANGED', 'CUSTOMER_CREATED')
-                   AND (?::timestamptz IS NULL OR occurred_at >= ?::timestamptz) ORDER BY id LIMIT ?",
+                // Cart events recorded before the cart was linked to its customer
+                // (commerce:cart-relink) take the cart's current customer.
+                "SELECT e.id, e.name, COALESCE(e.customer_id, CASE WHEN e.name = 'CART_UPDATED' THEN (SELECT k.customer_id FROM carts k
+                        WHERE k.tenant_id = e.tenant_id AND k.id::text = e.properties->>'cart_id') END) AS customer_id,
+                        e.occurred_at, e.source_event_id, e.is_backfill, e.properties FROM customer_events e
+                 WHERE e.tenant_id = ? AND e.id > ? AND e.name IN ('CART_UPDATED', 'ORDER_PLACED', 'ORDER_STATUS_CHANGED', 'CUSTOMER_CREATED', 'NEWSLETTER_SUBSCRIBED')
+                   AND (?::timestamptz IS NULL OR e.occurred_at >= ?::timestamptz) ORDER BY e.id LIMIT ?",
                 [$tenantId, $cursor ?? '00000000-0000-0000-0000-000000000000', $since, $since, $limit]),
             // A consent movement starts a run only for an address with exactly one customer.
             'consent_events' => DB::select(

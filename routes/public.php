@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\PublicLeadController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\UnsubscribeController;
 use App\Http\Controllers\WebhookController;
@@ -28,3 +29,14 @@ Route::post('u/{token}', [UnsubscribeController::class, 'apply'])
     ->where('token', '[A-Za-z0-9_-]{16,400}\.[A-Za-z0-9_-]{43}')
     ->middleware([RejectAdminHost::class, 'throttle:unsubscribe'])
     ->name('email.unsubscribe.apply');
+
+// Public lead/newsletter forms (versioned contract). Tenant from the form's
+// public id only; CORS answered per form (allowed origins), not globally.
+Route::post('public/v1/forms/{publicId}/subscribe', [PublicLeadController::class, 'subscribe'])
+    ->where('publicId', 'lf_[a-z0-9]{26}')
+    ->middleware([RejectAdminHost::class, 'throttle:lead-capture'])
+    ->name('leads.subscribe');
+Route::options('public/v1/forms/{publicId}/subscribe', [PublicLeadController::class, 'preflight'])
+    ->where('publicId', 'lf_[a-z0-9]{26}')
+    ->middleware(RejectAdminHost::class)
+    ->name('leads.preflight');

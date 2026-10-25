@@ -12,6 +12,8 @@ use App\Connectors\Ses\SnsMessageVerifier;
 use App\Consent\ConsentProviderFactory;
 use App\Email\EmailProviderResolver;
 use App\Integrations\ProviderRegistry;
+use App\Leads\Contracts\BotVerifier;
+use App\Leads\NullBotVerifier;
 use App\Logging\Redactor;
 use App\Models\PersonalAccessToken;
 use App\Observability\ErrorReporter;
@@ -52,6 +54,7 @@ class AppServiceProvider extends ServiceProvider
             $registry->registerWebhookHandler('amazon_ses', $app->make(SesWebhookHandler::class));
         });
         $this->app->singleton(EmailProviderResolver::class);
+        $this->app->bind(BotVerifier::class, NullBotVerifier::class);
         $this->app->resolving(EmailProviderResolver::class, function (EmailProviderResolver $resolver, $app) {
             $resolver->register('amazon_ses', $app->make(SesClientFactory::class));
         });
@@ -115,5 +118,8 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(600)->by('webhook:'.$request->ip()));
 
         RateLimiter::for('unsubscribe', fn (Request $request) => Limit::perMinute(60)->by('unsubscribe:'.$request->ip()));
+
+        // Coarse outer limit for public lead forms (per-form limits are in the controller).
+        RateLimiter::for('lead-capture', fn (Request $request) => Limit::perMinute(120)->by('lead:'.$request->ip()));
     }
 }

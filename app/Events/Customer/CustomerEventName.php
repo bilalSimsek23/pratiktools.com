@@ -13,6 +13,8 @@ enum CustomerEventName: string
     case OrderPlaced = 'ORDER_PLACED';
     case OrderStatusChanged = 'ORDER_STATUS_CHANGED';
     case CartUpdated = 'CART_UPDATED';
+    // A newsletter/lead form submission with consent (store-side, not İYS).
+    case NewsletterSubscribed = 'NEWSLETTER_SUBSCRIBED';
 
     public function schemaVersion(): int
     {
@@ -30,6 +32,7 @@ enum CustomerEventName: string
             self::OrderPlaced => ['order_id', 'channel', 'grand_total', 'currency', 'item_count'],
             self::OrderStatusChanged => ['order_id', 'from_status', 'to_status'],
             self::CartUpdated => ['cart_id', 'item_count', 'total'],
+            self::NewsletterSubscribed => ['form_id', 'placement'],
         };
     }
 }
