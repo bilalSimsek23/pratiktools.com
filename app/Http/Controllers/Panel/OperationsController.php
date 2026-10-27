@@ -46,12 +46,16 @@ final class OperationsController extends Controller
         return view('panel.suppressions', [
             'bySource' => DB::table('suppressions')->whereNull('lifted_at')->selectRaw('source, coalesce(channel, \'ALL\') AS channel, count(*) AS n')->groupBy('source', 'channel')->orderByDesc('n')->get(),
             'lifted' => DB::table('suppressions')->whereNotNull('lifted_at')->count(),
+            // Unsubscribe RET: local block first, then İYS (API or ViA Ret).
+            'ret' => DB::table('consent_write_intents')->where('status', 'RET')->where('source', 'UNSUBSCRIBE')
+                ->selectRaw("CASE WHEN state = 'confirmed' THEN 'confirmed' WHEN state = 'failed' THEN 'failed' ELSE 'pending' END AS s, count(*) AS n")->groupBy('s')->pluck('n', 's')->map(fn ($n) => (int) $n)->all(),
             'recent' => DB::table('suppressions as s')->join('consent_recipients as r', 'r.id', '=', 's.recipient_id')->whereNull('s.lifted_at')->orderByDesc('s.created_at')->limit(25)
-                ->get(['s.source', 's.channel', 's.created_at', 'r.address'])->map(function ($r) {
-                    $r->address = preg_replace('/^(.).*@(.).*(\.[^.]+)$/', '$1***@$2***$3', (string) $r->address);
+                ->get(['s.source', 's.channel', 's.created_at', 'r.address',
+                    DB::raw("(SELECT i.state FROM consent_write_intents i WHERE i.tenant_id = s.tenant_id AND i.recipient_id = s.recipient_id AND i.status = 'RET' ORDER BY i.created_at DESC LIMIT 1) AS ret_state")])->map(function ($r) {
+                        $r->address = preg_replace('/^(.).*@(.).*(\.[^.]+)$/', '$1***@$2***$3', (string) $r->address);
 
-                    return $r;
-                }),
+                        return $r;
+                    }),
         ]);
     }
 

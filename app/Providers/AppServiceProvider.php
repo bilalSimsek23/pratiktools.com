@@ -10,6 +10,8 @@ use App\Connectors\Ses\SesClientFactory;
 use App\Connectors\Ses\SesWebhookHandler;
 use App\Connectors\Ses\SnsMessageVerifier;
 use App\Consent\ConsentProviderFactory;
+use App\Consent\Via\UnconfiguredViaProvider;
+use App\Consent\Via\ViaConsentProvider;
 use App\Email\EmailProviderResolver;
 use App\Integrations\ProviderRegistry;
 use App\Leads\Contracts\BotVerifier;
@@ -55,6 +57,8 @@ class AppServiceProvider extends ServiceProvider
         });
         $this->app->singleton(EmailProviderResolver::class);
         $this->app->bind(BotVerifier::class, NullBotVerifier::class);
+        // No official ViA event format yet: ViA stays not configured.
+        $this->app->bind(ViaConsentProvider::class, UnconfiguredViaProvider::class);
         $this->app->resolving(EmailProviderResolver::class, function (EmailProviderResolver $resolver, $app) {
             $resolver->register('amazon_ses', $app->make(SesClientFactory::class));
         });

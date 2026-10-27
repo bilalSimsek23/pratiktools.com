@@ -2,6 +2,7 @@
 
 namespace App\Operations;
 
+use App\Consent\ConsentStrategy;
 use App\Consent\SendEligibility;
 use App\Consent\Sync\ConsentSynchronizer;
 use App\Email\EmailSendGuard;
@@ -22,6 +23,7 @@ final class IntegrationStatus
         private readonly EmailSendGuard $email,
         private readonly PushSendGuard $push,
         private readonly UnsubscribeTokens $unsubscribe,
+        private readonly ConsentStrategy $strategy,
     ) {}
 
     /**
@@ -71,6 +73,7 @@ final class IntegrationStatus
                 'consent_available' => $this->eligibility->iysAvailable(),
                 'last_successful_status_sync' => $iysSuccess,
                 'freshness_limit_hours' => (int) config('consent.eligibility.iys_max_age_hours'),
+                'strategy' => $this->strategy->state(),
             ],
         ];
     }

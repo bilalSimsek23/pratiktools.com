@@ -20,6 +20,10 @@ final class LeadForms
 {
     public const PLACEMENTS = ['popup', 'footer', 'landing_page', 'checkout'];
 
+    // local_only: checkbox evidence + pending İYS intent; via: İYS ViA
+    // acquisition, ONAY only after a verified ViA success.
+    public const CONSENT_MODES = ['local_only', 'via'];
+
     public function __construct(
         private readonly TenantContext $context,
         private readonly AuditLogger $audit,
@@ -56,6 +60,18 @@ final class LeadForms
             throw new LeadError('NOT_FOUND', 'Unknown form.');
         }
         $this->audit->record($active ? AuditAction::LeadFormActivated : AuditAction::LeadFormDeactivated, 'lead_form', $formId, [], $actor);
+    }
+
+    public function setConsentMode(string $formId, string $mode, Actor $actor): void
+    {
+        if (! in_array($mode, self::CONSENT_MODES, true)) {
+            throw new LeadError('INVALID_FORM', 'Consent mode must be local_only or via.');
+        }
+        $updated = DB::table('lead_forms')->where('tenant_id', $this->context->requireTenant())->where('id', $formId)->update(['consent_mode' => $mode, 'updated_at' => now()]);
+        if ($updated !== 1) {
+            throw new LeadError('NOT_FOUND', 'Unknown form.');
+        }
+        $this->audit->record(AuditAction::LeadFormConsentModeChanged, 'lead_form', $formId, ['mode' => $mode], $actor);
     }
 
     public function changeConsentText(string $formId, string $consentText, Actor $actor): int

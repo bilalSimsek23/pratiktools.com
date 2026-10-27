@@ -11,6 +11,30 @@ final class ExternalBlockers
     public function __construct(private readonly IntegrationStatus $integrations) {}
 
     /**
+     * The İYS row follows the tenant's consent strategy: with
+     * via_reconciliation the İYS API is not required, ViA + a fresh applied
+     * change report are.
+     *
+     * @param  array<string, mixed>  $iys
+     * @param  callable(string, bool, string, string): array{blocker: string, status: string, detail: string, action: ?string}  $row
+     * @return array{blocker: string, status: string, detail: string, action: ?string}
+     */
+    private function iys(array $iys, callable $row): array
+    {
+        $strategy = (array) ($iys['strategy'] ?? []);
+        if (($strategy['strategy'] ?? 'direct_api') === 'direct_api') {
+            return $row('IYS_API_ACCESS', (bool) ($iys['consent_available'] ?? false), ($iys['configured'] ?? false) ? 'İYS integration '.$iys['status'] : 'No İYS integration',
+                'Obtain İYS API access and complete the F2 shadow sync.');
+        }
+        $blocker = $strategy['blocker'] ?? null;
+        $age = $strategy['reconciliation']['age_hours'] ?? null;
+
+        return $row('IYS_VIA_RECONCILIATION', $blocker === null,
+            $blocker === null ? 'ViA configured · last reconciliation '.$age.' h ago' : ReadinessCatalog::explain($blocker)['explanation'],
+            ReadinessCatalog::explain($blocker)['action']);
+    }
+
+    /**
      * @param  array<string, array<string, mixed>>|null  $status
      * @return list<array{blocker: string, status: string, detail: string, action: ?string}>
      */
@@ -22,8 +46,7 @@ final class ExternalBlockers
         $row = fn (string $name, bool $ok, string $detail, string $action) => ['blocker' => $name, 'status' => $ok ? 'PASS' : 'BLOCKED', 'detail' => $detail, 'action' => $ok ? null : $action];
 
         return [
-            $row('IYS_API_ACCESS', (bool) ($s['iys']['consent_available'] ?? false), ($s['iys']['configured'] ?? false) ? 'İYS integration '.$s['iys']['status'] : 'No İYS integration',
-                'Obtain İYS API access and complete the F2 shadow sync.'),
+            $this->iys($s['iys'] ?? [], $row),
             $row('SES_PRODUCTION_ACCESS', ($s['amazon_ses']['production_access'] ?? null) === true,
                 ($s['amazon_ses']['production_access'] ?? null) === null ? 'Account status unknown' : 'Sandbox (production access not granted)', 'Wait for AWS SES production access.'),
             $row('EMAIL_UNSUBSCRIBE_KEY', ($s['amazon_ses']['unsubscribe_key'] ?? 'MISSING') === 'CONFIGURED', (string) ($s['amazon_ses']['unsubscribe_key'] ?? 'MISSING'),

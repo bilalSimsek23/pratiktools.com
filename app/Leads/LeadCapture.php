@@ -9,6 +9,7 @@ use App\Consent\ConsentStatus;
 use App\Consent\ConsentStore;
 use App\Consent\RecipientDirectory;
 use App\Consent\RecipientType;
+use App\Consent\Via\ViaConsentRequests;
 use App\Events\Customer\CustomerEventName;
 use App\Events\Customer\EventRecorder;
 use App\Leads\Contracts\BotVerifier;
@@ -31,8 +32,14 @@ use Illuminate\Support\Str;
  *   no merge on collision, never by phone; a new address becomes a lead
  *   customer only when no customer owns it.
  * - Consent: the checkbox is a store-side observation (LEAD_FORM), never
- *   İYS ONAY; the İYS ONAY is a pending_write_disabled intent. Evidence:
- *   form, consent text version and hash, placement, time; no IP.
+ *   İYS ONAY. Evidence: form, consent text version and hash, placement,
+ *   time; no IP.
+ *   consent_mode local_only: the İYS ONAY is a pending_write_disabled
+ *   intent and NEWSLETTER_SUBSCRIBED is recorded now.
+ *   consent_mode via: a ViA consent request is opened (IYS_PENDING); only
+ *   a verified ViA success makes it ONAY and records
+ *   NEWSLETTER_SUBSCRIBED (ViaConsentHandler). No İYS intent: ViA writes
+ *   to İYS itself.
  *
  * The outcome is for metrics only; the HTTP answer is the same for every
  * accepted, duplicate or bot submission (no enumeration).
@@ -47,6 +54,7 @@ final class LeadCapture
         private readonly EventRecorder $events,
         private readonly LeadMetrics $metrics,
         private readonly BotVerifier $bots,
+        private readonly ViaConsentRequests $via,
     ) {}
 
     public function tenantOf(string $publicId): ?string
@@ -165,6 +173,11 @@ final class LeadCapture
                 metadata: ['form_id' => $form->id, 'consent_version' => (int) $form->consent_version, 'double_opt_in' => $optIn ? 'pending' : 'not_required'],
                 evidence: ['form_public_id' => $form->public_id, 'consent_version' => (int) $form->consent_version, 'consent_text_hash' => $form->consent_text_hash,
                     'placement' => $form->placement, 'captured_at' => $now->toIso8601String()]);
+            if (($form->consent_mode ?? 'local_only') === 'via') {
+                $this->via->open($recipientId, $customerId, $form->id, (string) $id->id);
+
+                return $outcome;
+            }
             DB::table('consent_write_intents')->insert(['id' => (string) Str::uuid7(), 'tenant_id' => $tenantId, 'recipient_id' => $recipientId, 'target' => 'IYS',
                 'channel' => 'EMAIL', 'status' => 'ONAY', 'source' => 'LEAD_FORM', 'state' => 'pending_write_disabled', 'created_at' => $now, 'updated_at' => $now]);
 

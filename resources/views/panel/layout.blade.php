@@ -150,6 +150,9 @@
         <a href="{{ route('panel.senders') }}" @class(['active' => $route === 'panel.senders'])>Gönderici kimlikleri</a>
         @endif
         @if (isset($panelCan) && $panelCan(\App\Tenancy\Permission::IntegrationsView))
+        <a href="{{ route('panel.reconciliation') }}" @class(['active' => str_starts_with($route, 'panel.reconciliation')])>İYS mutabakat</a>
+        @endif
+        @if (isset($panelCan) && $panelCan(\App\Tenancy\Permission::IntegrationsView))
         <a href="{{ route('panel.integrations') }}" @class(['active' => $route === 'panel.integrations'])>Entegrasyonlar</a>
         @endif
         <a href="{{ route('panel.settings') }}" @class(['active' => $route === 'panel.settings'])>Ayarlar</a>

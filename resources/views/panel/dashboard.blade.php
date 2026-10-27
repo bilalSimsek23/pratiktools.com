@@ -7,8 +7,8 @@
     $sys = [
         ['Ticimax', $tcx['connected'] ? ['b-pass', 'Bağlı'] : ($tcx['configured'] ? ['b-warn', 'Kontrol gerekli'] : ['b-bad', 'Bağlı değil']),
             $tcx['last_sync'] ? 'Son senkron: '.\Illuminate\Support\Carbon::parse($tcx['last_sync']->started_at)->diffForHumans() : 'Henüz senkron yok'],
-        ['İYS', $iys['consent_available'] ? ['b-pass', 'Doğrulanıyor'] : ['b-bad', 'API erişimi bekleniyor'],
-            $iys['consent_available'] ? 'İzinler İYS ile doğrulanıyor' : 'Pazarlama e-postası İYS olmadan gönderilemez'],
+        ['İYS', $iys['strategy']['ready'] ? ['b-pass', 'Doğrulanıyor'] : ['b-bad', $iys['strategy']['strategy'] === 'direct_api' ? 'API erişimi bekleniyor' : 'ViA/mutabakat bekleniyor'],
+            $iys['strategy']['label'].' · '.($iys['strategy']['ready'] ? 'izinler doğrulanıyor' : 'pazarlama e-postası İYS doğrulaması olmadan gönderilemez')],
         ['Amazon SES', ! $ses['configured'] ? ['b-bad', 'Bağlı değil'] : (($ses['production_access'] ?? null) === true ? ['b-pass', 'Production'] : ['b-bad', 'Production erişimi bekleniyor']),
             $ses['configured'] ? 'Bölge '.($ses['region'] ?? '—').' · gönderim '.strtoupper($ses['sending_mode']) : 'Hesap bu ortamda bağlı değil'],
         ['OneSignal', ! $os['configured'] ? ['b-bad', 'Bağlı değil'] : (($os['external_id_coverage']['with'] ?? 0) > 0 ? ['b-pass', 'Bağlı'] : ['b-warn', 'Kimlik eşleştirme gerekli']),

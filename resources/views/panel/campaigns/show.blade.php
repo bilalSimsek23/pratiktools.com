@@ -111,6 +111,8 @@
             </li>
         @endforeach
     </ul>
+    <p class="small muted">İzin kaynağı: {{ $readiness['consent']['source'] }}@if ($readiness['consent']['strategy'] === 'via_reconciliation') · Son İYS mutabakatı: {{ $readiness['consent']['last_reconciliation'] ? \Illuminate\Support\Carbon::parse($readiness['consent']['last_reconciliation'])->format('d.m.Y').' ('.$readiness['consent']['reconciliation_age_hours'].' saat önce)' : 'yok' }}@endif
+        · Dondurulan kitle izni dondurmaz; izin gönderim anında yeniden kontrol edilir.</p>
     @if ($can['publish'] || $can['manage'])
     <div class="actions stack-top">
         @if ($c->status === 'draft' && $can['publish'])

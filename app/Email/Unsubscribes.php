@@ -9,6 +9,8 @@ use App\Consent\ConsentChannel;
 use App\Consent\ConsentSourceProvider;
 use App\Consent\ConsentStatus;
 use App\Consent\ConsentStore;
+use App\Consent\ConsentStrategy;
+use App\Consent\ConsentStrategyMode;
 use App\Consent\RecipientType;
 use App\Consent\SuppressionService;
 use App\Consent\SuppressionSource;
@@ -18,10 +20,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Applies an unsubscribe: local suppression (UNSUBSCRIBE, marketing),
- * a REVOKED observation in the Consent Engine (the recipient's explicit
- * change) and an İYS RET write intent kept as pending: İYS writing is not
- * enabled in this phase, so nothing is sent to İYS.
+ * Applies an unsubscribe, local first and without waiting for anyone:
+ * local suppression (UNSUBSCRIBE, marketing) and a REVOKED observation in
+ * the Consent Engine (the recipient's explicit change, local RET) block
+ * marketing immediately. Then an İYS RET intent is recorded for the
+ * tenant's route (direct_api: İYS API; via_reconciliation: ViA Ret, with
+ * a correlation reference). It stays pending: no İYS or ViA write is
+ * enabled, and whatever happens to it later the local block stays.
  *
  * Replay safe: each token is applied once (email_unsubscribes); repeating
  * the request returns "already" and changes nothing.
@@ -34,6 +39,7 @@ final class Unsubscribes
         private readonly SuppressionService $suppressions,
         private readonly ConsentStore $consents,
         private readonly AuditLogger $audit,
+        private readonly ConsentStrategy $strategy,
     ) {}
 
     /**
@@ -66,11 +72,14 @@ final class Unsubscribes
                 $this->consents->observe((string) $recipient, ConsentChannel::Email, RecipientType::Individual, ConsentSourceProvider::PratikTools, ConsentStatus::Revoked,
                     $now, 'unsubscribe:'.$tokenHash, source: 'UNSUBSCRIBE_LINK', metadata: ['explicit_change' => true, 'method' => $method]);
 
+                $via = $this->strategy->mode() === ConsentStrategyMode::ViaReconciliation;
                 DB::table('consent_write_intents')->insert([
                     'id' => (string) Str::uuid7(), 'tenant_id' => $data['tenant_id'], 'recipient_id' => $recipient, 'target' => 'IYS', 'channel' => 'EMAIL',
-                    'status' => 'RET', 'source' => 'UNSUBSCRIBE', 'state' => 'pending_write_disabled', 'created_at' => $now, 'updated_at' => $now,
+                    'status' => 'RET', 'source' => 'UNSUBSCRIBE', 'state' => 'pending_write_disabled', 'route' => $via ? 'via_ret' : 'direct_api',
+                    'reference' => $via ? 'ret_'.Str::lower(Str::random(32)) : null, 'created_at' => $now, 'updated_at' => $now,
                 ]);
-                $this->audit->record(AuditAction::EmailUnsubscribed, 'consent_recipient', (string) $recipient, ['method' => $method, 'iys_write' => 'pending_write_disabled'], $actor);
+                $this->audit->record(AuditAction::EmailUnsubscribed, 'consent_recipient', (string) $recipient,
+                    ['method' => $method, 'iys_write' => 'pending_write_disabled', 'route' => $via ? 'via_ret' : 'direct_api'], $actor);
 
                 return 'unsubscribed';
             });

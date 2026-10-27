@@ -19,6 +19,8 @@ enum EligibilityReason: string
     case IysPending = 'IYS_PENDING';
     case IysUnavailable = 'IYS_UNAVAILABLE';
     case IysStale = 'IYS_STALE';
+    // via_reconciliation: the last applied İYS change report is too old.
+    case IysReconciliationStale = 'IYS_RECONCILIATION_STALE';
     case IdentityConflict = 'IDENTITY_CONFLICT';
     case MerchantPolicyReview = 'MERCHANT_POLICY_REVIEW';
     case NoMarketingConsent = 'NO_MARKETING_CONSENT';

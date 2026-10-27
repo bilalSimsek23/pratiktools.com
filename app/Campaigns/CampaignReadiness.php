@@ -2,7 +2,7 @@
 
 namespace App\Campaigns;
 
-use App\Consent\SendEligibility;
+use App\Consent\ConsentStrategy;
 use App\Email\EmailSendGuard;
 use App\Email\EmailSendingMode;
 use App\Email\UnsubscribeTokens;
@@ -26,14 +26,14 @@ final class CampaignReadiness
     public function __construct(
         private readonly TenantContext $context,
         private readonly CampaignAudience $audience,
-        private readonly SendEligibility $eligibility,
         private readonly EmailSendGuard $guard,
         private readonly UnsubscribeTokens $unsubscribe,
+        private readonly ConsentStrategy $strategy,
     ) {}
 
     /**
      * @param  array<string, mixed>|null  $audienceReport  reuse a computed report
-     * @return array{can_prepare: bool, sendable: bool, reason_codes: list<string>, checks: list<array{check: string, status: string, reason: ?string, group: string}>}
+     * @return array{can_prepare: bool, sendable: bool, reason_codes: list<string>, checks: list<array{check: string, status: string, reason: ?string, group: string}>, consent: array<string, mixed>}
      */
     public function evaluate(object $campaign, ?array $audienceReport = null): array
     {
@@ -65,7 +65,8 @@ final class CampaignReadiness
         $add('MAIL_FROM', 'advisory', $sender !== null && $sender->mail_from_status === 'verified', 'MAIL_FROM_NOT_CONFIGURED', warnOnly: true);
         $add('UNSUBSCRIBE', 'preparation', $this->unsubscribe->available(), 'EMAIL_UNSUBSCRIBE_KEY_MISSING');
 
-        $add('IYS', 'delivery', $this->eligibility->iysAvailable(), 'IYS_UNAVAILABLE');
+        $consent = $this->strategy->state();
+        $add('IYS', 'delivery', $consent['ready'], $consent['blocker'] ?? 'IYS_UNAVAILABLE');
         $add('ELIGIBLE_AUDIENCE', 'delivery', $report !== null && $report['currently_eligible'] > 0, 'NO_ELIGIBLE_RECIPIENTS');
         $account = (array) (json_decode((string) DB::table('tenant_integrations')->where('tenant_id', $tenantId)->where('id', $campaign->integration_id)->value('settings'), true)['account'] ?? []);
         $add('SES_PRODUCTION_ACCESS', 'delivery', ($account['production_access'] ?? null) === true, $account === [] ? 'PROVIDER_STATUS_UNKNOWN' : 'SES_SANDBOX');
@@ -80,6 +81,10 @@ final class CampaignReadiness
             'sendable' => $blocked === [],
             'reason_codes' => array_values(array_map(fn ($c) => (string) $c['reason'], $blocked)),
             'checks' => $checks,
+            // Provenance only: consent is never frozen with the audience; it
+            // is re-checked at dispatch and send time.
+            'consent' => ['strategy' => $consent['strategy'], 'source' => $consent['source_label'],
+                'last_reconciliation' => $consent['reconciliation']['last_applied']['period_end'] ?? null, 'reconciliation_age_hours' => $consent['reconciliation']['age_hours']],
         ];
     }
 }

@@ -77,6 +77,18 @@ final class LeadFormController extends Controller
         return $this->done("İzin metni güncellendi (versiyon {$v}).");
     }
 
+    public function consentMode(Request $request, string $form, LeadForms $forms): RedirectResponse
+    {
+        $this->authorizePanel(Permission::FormsManage);
+        try {
+            $forms->setConsentMode($form, (string) $request->validate(['consent_mode' => 'required|in:local_only,via'])['consent_mode'], $this->actor());
+        } catch (LeadError $e) {
+            return $this->failed($e->getMessage());
+        }
+
+        return $this->done('İzin modu güncellendi.');
+    }
+
     public function leads(LeadReport $report): View
     {
         $this->authorizePanel(Permission::LeadsView);

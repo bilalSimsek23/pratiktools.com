@@ -29,7 +29,7 @@ final class VerifyDatabaseRoles extends Command
         'email_messages', 'email_events', 'email_unsubscribes', 'email_usage_daily', 'consent_write_intents',
         'segments', 'segment_snapshots', 'segment_snapshot_members', 'automation_versions', 'automation_runs', 'automation_run_steps',
         'automation_planned_actions', 'automation_trigger_cursors', 'lead_forms', 'lead_submissions',
-        'campaign_approvals', 'tenant_notifications',
+        'campaign_approvals', 'tenant_notifications', 'via_consent_requests', 'iys_reconciliation_batches', 'iys_consent_changes',
     ];
 
     /** Tables the platform role may read metadata of, but never these columns. */

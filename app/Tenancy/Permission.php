@@ -47,4 +47,6 @@ enum Permission: string
     // Queue test-only dispatches to allowlisted recipients.
     case CampaignsTestDispatch = 'campaigns.test_dispatch';
     case SuppressionsView = 'suppressions.view';
+    // Upload, analyse and apply İYS change reports (owner, admin).
+    case ConsentReconcile = 'consent.reconcile';
 }

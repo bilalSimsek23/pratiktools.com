@@ -74,6 +74,14 @@ enum AuditAction: string
     case LeadFormActivated = 'lead_form.activated';
     case LeadFormDeactivated = 'lead_form.deactivated';
     case LeadFormConsentChanged = 'lead_form.consent_text_changed';
+    case LeadFormConsentModeChanged = 'lead_form.consent_mode_changed';
+    case ConsentStrategyChanged = 'consent.strategy_changed';
+    case ViaConsentCompleted = 'consent.via_completed';
+    case ViaConsentFailed = 'consent.via_failed';
+    case ViaRetCompleted = 'consent.via_ret_completed';
+    case ViaRetFailed = 'consent.via_ret_failed';
+    case IysReconciliationAnalyzed = 'consent.reconciliation_analyzed';
+    case IysReconciliationApplied = 'consent.reconciliation_applied';
     case CommerceRelinked = 'commerce.relinked';
     case CampaignApprovalRequested = 'campaign.approval_requested';
     case CampaignApproved = 'campaign.approved';

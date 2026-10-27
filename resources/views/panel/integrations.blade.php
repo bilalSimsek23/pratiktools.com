@@ -12,11 +12,11 @@
             'Son senkron' => $tcx['last_sync'] ? $when($tcx['last_sync']->started_at).' · '.$tcx['last_sync']->entity.' · '.$tcx['last_sync']->status : 'Henüz yok',
             'Yetenek' => 'Veri okuma · Ticimax\'e yazma kapalı',
         ], $blocked('TICIMAX_VAULT_CONNECTION')],
-        ['İYS', 'İleti Yönetim Sistemi — pazarlama izni doğrulama', $iys, [
-            'Sağlık' => $iys['consent_available'] ? 'İzin doğrulaması çalışıyor' : 'İzin doğrulanamıyor',
-            'Son senkron' => $iys['last_successful_status_sync'] ? $when($iys['last_successful_status_sync']) : 'Henüz yok',
-            'Yetenek' => 'İzin okuma · İYS\'ye yazma kapalı',
-        ], $blocked('IYS_API_ACCESS')],
+        ['İYS', 'İleti Yönetim Sistemi — pazarlama izni · strateji: '.$iys['strategy']['label'], $iys, [
+            'Sağlık' => $iys['strategy']['ready'] ? 'İzin kararı verilebiliyor' : 'Fail-closed ('.$iys['strategy']['blocker'].')',
+            'İYS API senkronu' => $iys['last_successful_status_sync'] ? $when($iys['last_successful_status_sync']) : 'Henüz yok'.($iys['strategy']['direct_api']['required'] ? '' : ' · bu stratejide gerekli değil'),
+            'Yetenek' => 'İzin okuma · İYS/ViA\'ya yazma kapalı',
+        ], $blocked('IYS_API_ACCESS', 'IYS_VIA_RECONCILIATION'), 'iys'],
         ['Amazon SES', 'E-posta gönderim altyapısı', $ses, [
             'Sağlık' => ($ses['production_access'] ?? null) === true ? 'Production erişimi var' : (($ses['production_access'] ?? null) === false ? 'Sandbox (yalnızca doğrulanmış alıcılar)' : 'Hesap durumu bilinmiyor'),
             'Son kontrol' => $when($ses['account_checked_at'] ?? null).' · bölge '.($ses['region'] ?? '—'),
@@ -33,7 +33,8 @@
     <div><h1>Entegrasyonlar</h1><p>Bağlantı ve sağlık durumu. Anahtar ve gizli değerler hiçbir ekranda gösterilmez; yalnızca kasada (vault) olup olmadıkları gösterilir.</p></div>
 </div>
 <div class="grid g2">
-    @foreach ($cards as [$name, $what, $i, $facts, $bs])
+    @foreach ($cards as $card)
+        @php([$name, $what, $i, $facts, $bs] = $card)
         @php([$cls, $label] = $conn($i))
         <div class="card">
             <div class="split"><div><h2>{{ $name }}</h2><div class="small muted">{{ $what }}</div></div><span class="badge {{ $cls }}">{{ $label }}</span></div>
@@ -45,6 +46,11 @@
             @foreach ($bs as $b)
                 <p class="small"><strong>{{ $b['detail'] }}</strong>@if ($b['action'])<br><span class="todo">→ {{ $b['action'] }}</span>@endif</p>
             @endforeach
+            @if (($card[5] ?? null) === 'iys')
+                <h3 class="stack-top">ViA + günlük mutabakat</h3>
+                @include('panel.reconciliation._iys', ['state' => $iys['strategy']])
+                <a class="small" href="{{ route('panel.reconciliation') }}">İYS › Mutabakat →</a>
+            @endif
         </div>
     @endforeach
 </div>

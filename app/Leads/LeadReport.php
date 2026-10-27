@@ -37,6 +37,9 @@ final class LeadReport
             'consent_unchecked' => (clone $s)->where('consent_checked', false)->count(),
             'double_opt_in' => (clone $s)->selectRaw('opt_in_status, count(*) AS n')->groupBy('opt_in_status')->pluck('n', 'opt_in_status')->map(fn ($n) => (int) $n)->all(),
             'pending_iys_onay' => DB::table('consent_write_intents')->where('tenant_id', $tenantId)->where('source', 'LEAD_FORM')->where('state', 'pending_write_disabled')->count(),
+            'via_pending' => $scope(DB::table('via_consent_requests')->where('tenant_id', $tenantId)->where('state', 'pending'))->count(),
+            'via_succeeded' => $scope(DB::table('via_consent_requests')->where('tenant_id', $tenantId)->where('state', 'succeeded'))->count(),
+            'via_failed' => $scope(DB::table('via_consent_requests')->where('tenant_id', $tenantId)->whereIn('state', ['failed', 'expired']))->count(),
             'by_placement' => (clone $s)->selectRaw('placement, count(*) AS n')->groupBy('placement')->pluck('n', 'placement')->map(fn ($n) => (int) $n)->all(),
             'by_utm_source' => (clone $s)->whereNotNull('utm_source')->selectRaw('utm_source, count(*) AS n')->groupBy('utm_source')->orderByDesc('n')->limit(20)->pluck('n', 'utm_source')->map(fn ($n) => (int) $n)->all(),
         ];

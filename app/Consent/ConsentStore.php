@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
  * - consents keeps the latest state per recipient, channel, recipient type
  *   and source provider. An observation older than the stored one ("as of"
  *   time) never overwrites it, so a late-arriving historic movement cannot
- *   undo a fresher status.
+ *   undo a fresher status; at the same instant a RET is never replaced.
  * - consent_events gets one append-only row per observed change, unique per
  *   provider event key, so re-reading the same data adds nothing.
  * - No automation is triggered (shadow mode).
@@ -43,6 +43,7 @@ final class ConsentStore
         bool $backfill = false,
         array $metadata = [],
         array $evidence = [],
+        ?string $reconciliationBatchId = null,
     ): bool {
         $tenantId = $this->context->requireTenant();
         $asOfString = CarbonImmutable::instance($asOf)->utc()->format('Y-m-d\TH:i:s.uP');
@@ -53,18 +54,21 @@ final class ConsentStore
             [$tenantId, $recipientId, $channel->value, $recipientType->value, $provider->value],
         );
 
-        $newer = $current === null || $current->as_of === null || CarbonImmutable::parse($current->as_of)->lte(CarbonImmutable::instance($asOf));
+        $currentAsOf = $current?->as_of === null ? null : CarbonImmutable::parse($current->as_of);
+        // Same instant, different answer: a RET is never replaced (RET wins ties).
+        $newer = $currentAsOf === null || $currentAsOf->lt(CarbonImmutable::instance($asOf))
+            || ($currentAsOf->eq(CarbonImmutable::instance($asOf)) && ($current->status !== ConsentStatus::Revoked->value || $status === ConsentStatus::Revoked));
         $changed = $current === null || $current->status !== $status->value;
 
         if ($changed) {
             DB::affectingStatement(
-                'INSERT INTO consent_events (id, tenant_id, recipient_id, name, channel, recipient_type, source_provider, old_status, new_status, source, provider_transaction_id, event_key, occurred_at, observed_at, is_backfill, metadata)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), ?, ?::jsonb)
+                'INSERT INTO consent_events (id, tenant_id, recipient_id, name, channel, recipient_type, source_provider, old_status, new_status, source, provider_transaction_id, event_key, occurred_at, observed_at, is_backfill, metadata, reconciliation_batch_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), ?, ?::jsonb, ?)
                  ON CONFLICT (tenant_id, source_provider, event_key) DO NOTHING',
                 [
                     (string) Str::uuid7(), $tenantId, $recipientId, 'CONSENT_'.$status->value, $channel->value, $recipientType->value, $provider->value,
                     $newer ? $current?->status : null, $status->value, $source, $externalId, mb_substr($eventKey, 0, 191), $asOfString,
-                    $backfill || ! $newer, json_encode(array_filter(['stale_observation' => ! $newer ?: null] + $metadata, fn ($v) => $v !== null)),
+                    $backfill || ! $newer, json_encode(array_filter(['stale_observation' => ! $newer ?: null] + $metadata, fn ($v) => $v !== null)), $reconciliationBatchId,
                 ],
             );
         }

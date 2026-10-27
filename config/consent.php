@@ -34,6 +34,31 @@ return [
         'store_opt_out_blocks' => true,
     ],
 
+    // F2-R: ViA consent acquisition + İYS daily change reports. The tenant's
+    // consent_strategy (direct_api | via_reconciliation) is chosen by an
+    // operator (consent:strategy); nothing here switches it.
+    'reconciliation' => [
+        // Hours an applied change report (its period end) keeps consent
+        // decisions current. No default: the legal freshness window is an
+        // operator decision, and without it via_reconciliation stays
+        // fail-closed.
+        'max_age_hours' => env('IYS_RECONCILIATION_MAX_AGE'),
+        // Report format (a key of parsers). No official format is known
+        // yet, so none is registered and uploads are refused as
+        // FORMAT_NOT_CONFIGURED instead of guessed.
+        'format' => env('IYS_RECONCILIATION_FORMAT'),
+        'parsers' => [],
+        'max_file_bytes' => (int) env('IYS_RECONCILIATION_MAX_FILE_BYTES', 50 * 1024 * 1024),
+        'max_line_bytes' => 4096,
+        'max_rows' => (int) env('IYS_RECONCILIATION_MAX_ROWS', 2_000_000),
+        'chunk' => 500,
+    ],
+
+    'via' => [
+        // Pending ViA acquisitions older than this are expired (never ONAY).
+        'pending_hours' => 72,
+    ],
+
     // Shadow mode: PratikTools never writes consent anywhere.
     'shadow_mode' => true,
 

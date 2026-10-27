@@ -3,36 +3,49 @@
 namespace App\Consent;
 
 use App\Consent\Data\EligibilityDecision;
-use App\Consent\Sync\ConsentSynchronizer;
-use App\Models\TenantIntegration;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 
 /**
  * "May we send this marketing message?" — computed, never acted on in F2.
  *
+ * The official İYS state of an address is the latest observation (by its
+ * "as of" time) of the official sources: the İYS API, a verified ViA event
+ * or an applied İYS change report. On a tie RET wins. Local suppressions
+ * (unsubscribe, bounce, complaint, manual) are never overridden by it.
+ *
  * E-mail rules, first match wins (doubt means no):
  *  1. invalid address                          INVALID_EMAIL
  *  2. marketplace relay address                MARKETPLACE_IDENTITY
  *  3. active local suppression                 LOCAL_SUPPRESSED
- *  4. İYS RET (individual or merchant)         IYS_REVOKED      (RET always wins)
- *  5. no successful İYS sync for the tenant    IYS_UNAVAILABLE
- *  6. only a merchant (TACIR) ONAY             MERCHANT_POLICY_REVIEW
- *  7. no İYS answer / not in ONAY              IYS_UNKNOWN
- *  8. İYS pending                              IYS_PENDING
- *  9. İYS ONAY older than the freshness limit  IYS_STALE
- * 10. explicit opt-out at the store after the
- *     İYS consent date (policy, default on)    SOURCE_REVOKED
- * 11. address shared by several customers      IDENTITY_CONFLICT
- * 12. otherwise                                ALLOWED
+ *  4. official RET (individual or merchant)    IYS_REVOKED      (RET always wins)
+ *  5. the tenant's consent strategy cannot
+ *     back a decision (ConsentStrategy)        IYS_UNAVAILABLE
+ *  6. via_reconciliation: last applied İYS
+ *     change report older than the policy      IYS_RECONCILIATION_STALE
+ *  7. no official answer, ViA still pending    IYS_PENDING
+ *  8. only a merchant (TACIR) ONAY             MERCHANT_POLICY_REVIEW
+ *  9. no official answer / not in ONAY         IYS_UNKNOWN
+ * 10. official pending                         IYS_PENDING
+ * 11. direct_api: ONAY older than the
+ *     freshness limit                          IYS_STALE
+ * 12. explicit opt-out at the store after the
+ *     official consent date (policy, on)       SOURCE_REVOKED
+ * 13. address shared by several customers      IDENTITY_CONFLICT
+ * 14. otherwise                                ALLOWED
  *
  * One SQL expression serves single decisions and whole audiences, so both
- * always agree. SMS and call are modelled but not evaluated yet; push
- * permission will come from the device subscription, never from İYS.
+ * always agree, and every caller (audience, automation, dispatch guard)
+ * re-evaluates it at decision time. SMS and call are modelled but not
+ * evaluated yet; push permission will come from the device subscription,
+ * never from İYS.
  */
 final class SendEligibility
 {
-    public function __construct(private readonly TenantContext $context) {}
+    public function __construct(
+        private readonly TenantContext $context,
+        private readonly ConsentStrategy $strategy,
+    ) {}
 
     public function forCustomer(string $customerId, ConsentChannel $channel = ConsentChannel::Email): EligibilityDecision
     {
@@ -92,6 +105,13 @@ final class SendEligibility
      */
     public function sql(string $filter = ''): string
     {
+        $official = "'".implode("', '", ConsentSourceProvider::OFFICIAL)."'";
+        $latest = fn (string $type) => "LEFT JOIN LATERAL (
+                    SELECT c.status, c.last_verified_at, c.consent_date FROM consents c
+                    WHERE c.tenant_id = r.tenant_id AND c.recipient_id = r.id AND c.channel = 'EMAIL' AND c.recipient_type = '{$type}' AND c.source_provider IN ({$official})
+                    ORDER BY (c.metadata->>'as_of')::timestamptz DESC NULLS LAST, (c.status = 'REVOKED') DESC LIMIT 1
+                )";
+
         return <<<SQL
             SELECT b.*,
                 CASE
@@ -100,10 +120,12 @@ final class SendEligibility
                     WHEN b.suppressed THEN 'LOCAL_SUPPRESSED'
                     WHEN b.iys_i = 'REVOKED' OR b.iys_m = 'REVOKED' THEN 'IYS_REVOKED'
                     WHEN NOT ?::boolean THEN 'IYS_UNAVAILABLE'
+                    WHEN ?::boolean THEN 'IYS_RECONCILIATION_STALE'
+                    WHEN (b.iys_i IS NULL OR b.iys_i = 'UNKNOWN') AND b.via_pending THEN 'IYS_PENDING'
                     WHEN (b.iys_i IS NULL OR b.iys_i = 'UNKNOWN') AND b.iys_m = 'GRANTED' THEN 'MERCHANT_POLICY_REVIEW'
                     WHEN b.iys_i IS NULL OR b.iys_i = 'UNKNOWN' THEN 'IYS_UNKNOWN'
                     WHEN b.iys_i = 'PENDING' THEN 'IYS_PENDING'
-                    WHEN b.iys_i_verified IS NULL OR b.iys_i_verified < ?::timestamptz THEN 'IYS_STALE'
+                    WHEN ?::boolean AND (b.iys_i_verified IS NULL OR b.iys_i_verified < ?::timestamptz) THEN 'IYS_STALE'
                     WHEN ?::boolean AND b.store_revoked_at IS NOT NULL AND (b.iys_i_date IS NULL OR b.store_revoked_at > b.iys_i_date) THEN 'SOURCE_REVOKED'
                     WHEN b.customers > 1 THEN 'IDENTITY_CONFLICT'
                     ELSE 'ALLOWED'
@@ -113,12 +135,13 @@ final class SendEligibility
                     (SELECT count(*) FROM recipient_customers rc WHERE rc.tenant_id = r.tenant_id AND rc.recipient_id = r.id) AS customers,
                     EXISTS (SELECT 1 FROM suppressions s WHERE s.tenant_id = r.tenant_id AND s.recipient_id = r.id AND s.lifted_at IS NULL AND (s.channel IS NULL OR s.channel = 'EMAIL')) AS suppressed,
                     ii.status AS iys_i, ii.last_verified_at AS iys_i_verified, ii.consent_date AS iys_i_date, im.status AS iys_m,
+                    EXISTS (SELECT 1 FROM via_consent_requests v WHERE v.tenant_id = r.tenant_id AND v.recipient_id = r.id AND v.channel = 'EMAIL' AND v.state = 'pending') AS via_pending,
                     (SELECT max((c.metadata->>'as_of')::timestamptz) FROM consents c
-                       WHERE c.tenant_id = r.tenant_id AND c.recipient_id = r.id AND c.channel = 'EMAIL' AND c.source_provider <> 'IYS'
+                       WHERE c.tenant_id = r.tenant_id AND c.recipient_id = r.id AND c.channel = 'EMAIL' AND c.source_provider NOT IN ({$official})
                          AND c.status = 'REVOKED' AND jsonb_exists(c.metadata, 'explicit_change')) AS store_revoked_at
                 FROM consent_recipients r
-                LEFT JOIN consents ii ON ii.tenant_id = r.tenant_id AND ii.recipient_id = r.id AND ii.channel = 'EMAIL' AND ii.recipient_type = 'INDIVIDUAL' AND ii.source_provider = 'IYS'
-                LEFT JOIN consents im ON im.tenant_id = r.tenant_id AND im.recipient_id = r.id AND im.channel = 'EMAIL' AND im.recipient_type = 'MERCHANT' AND im.source_provider = 'IYS'
+                {$latest('INDIVIDUAL')} ii ON true
+                {$latest('MERCHANT')} im ON true
                 WHERE r.tenant_id = ? AND r.address_type = 'email' {$filter}
             ) b
             SQL;
@@ -129,8 +152,12 @@ final class SendEligibility
      */
     public function bindings(): array
     {
+        [$operational, $stale, $rowFreshness] = $this->strategy->eligibilityFlags();
+
         return [
-            $this->iysAvailable(),
+            $operational,
+            $stale,
+            $rowFreshness,
             now()->subHours((int) config('consent.eligibility.iys_max_age_hours'))->toIso8601String(),
             (bool) config('consent.eligibility.store_opt_out_blocks'),
             $this->context->requireTenant(),
@@ -139,16 +166,10 @@ final class SendEligibility
 
     /**
      * İYS counts as available once a full status sync has succeeded for the
-     * tenant's consent integration.
+     * tenant's consent integration (direct_api strategy).
      */
     public function iysAvailable(): bool
     {
-        $integration = TenantIntegration::query()->where('provider', 'iys')->where('capability', 'consent')->first();
-
-        return $integration !== null && DB::table('integration_sync_cursors')
-            ->where('integration_id', $integration->id)
-            ->where('entity', ConsentSynchronizer::ENTITY_IYS_STATUS)
-            ->whereNotNull('last_success_at')
-            ->exists();
+        return $this->strategy->directApiAvailable();
     }
 }

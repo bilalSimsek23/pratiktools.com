@@ -7,6 +7,7 @@ use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Panel\DispatchController;
 use App\Http\Controllers\Panel\LeadFormController;
 use App\Http\Controllers\Panel\OperationsController;
+use App\Http\Controllers\Panel\ReconciliationController;
 use App\Http\Controllers\Panel\SegmentAutomationController;
 use App\Http\Middleware\PanelRecentAuth;
 use App\Http\Middleware\PanelTenant;
@@ -76,11 +77,16 @@ Route::middleware('auth:web')->group(function () {
         Route::get('forms/{form}', [LeadFormController::class, 'show'])->whereUuid('form')->name('forms.show');
         Route::post('forms/{form}/active', [LeadFormController::class, 'active'])->whereUuid('form')->middleware(PanelRecentAuth::class)->name('forms.active');
         Route::post('forms/{form}/consent', [LeadFormController::class, 'consent'])->whereUuid('form')->middleware(PanelRecentAuth::class)->name('forms.consent');
+        Route::post('forms/{form}/consent-mode', [LeadFormController::class, 'consentMode'])->whereUuid('form')->middleware(PanelRecentAuth::class)->name('forms.consent-mode');
         Route::get('leads', [LeadFormController::class, 'leads'])->name('leads');
 
         Route::get('integrations', [OperationsController::class, 'integrations'])->name('integrations');
         Route::get('readiness', [OperationsController::class, 'readiness'])->name('readiness');
         Route::get('suppressions', [OperationsController::class, 'suppressions'])->name('suppressions');
+        Route::get('iys/reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation');
+        Route::post('iys/reconciliation', [ReconciliationController::class, 'store'])->middleware('throttle:6,1')->name('reconciliation.store');
+        Route::get('iys/reconciliation/{batch}', [ReconciliationController::class, 'show'])->whereUuid('batch')->name('reconciliation.show');
+        Route::post('iys/reconciliation/{batch}/apply', [ReconciliationController::class, 'apply'])->whereUuid('batch')->middleware(PanelRecentAuth::class)->name('reconciliation.apply');
         Route::get('settings', [OperationsController::class, 'settings'])->name('settings');
         Route::post('settings/sending-mode', [OperationsController::class, 'sendingMode'])->middleware(PanelRecentAuth::class)->name('settings.sending-mode');
     });
