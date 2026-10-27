@@ -115,6 +115,18 @@ invalidates); dispatch is test-only to the allowlist, planned without provider c
 idempotent, and guarded again before the provider. Live sending is hard-blocked. See
 [docs/production/operations-panel.md](docs/production/operations-panel.md).
 
+## Consent without the İYS API (F2-R)
+
+A tenant consent strategy: `direct_api` (F2, default, unchanged) or `via_reconciliation`
+(İYS ViA for acquisition and ViA Ret, plus İYS daily change reports), chosen only by an
+operator (`consent:strategy`). The official İYS state is the latest of the İYS API, verified
+ViA events and applied change reports; RET wins ties, and local unsubscribes and suppressions
+are never lifted by it. Reports are uploaded under İYS › Mutabakat: dry-run, then apply once
+(checksum, duplicate and conflict handling, no addresses stored). No ViA event format and no
+İYS report format are implemented until official documentation or samples exist, so both stay
+"not configured" and eligibility stays fail-closed. See
+[docs/production/consent-via-reconciliation.md](docs/production/consent-via-reconciliation.md).
+
 ## Production (Laravel Cloud)
 
 See [docs/production/laravel-cloud.md](docs/production/laravel-cloud.md): boot safety rules, the
