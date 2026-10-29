@@ -72,7 +72,7 @@
         @foreach ($blockers as $b)
             <tr>
                 <td><strong>{{ \Illuminate\Support\Str::of($b['blocker'])->replace('_', ' ')->title() }}</strong></td>
-                <td>@if ($b['status'] === 'PASS')<span class="badge b-pass">Tamam</span>@else<span class="badge b-bad">Engelli</span>@endif</td>
+                <td>@if ($b['status'] === 'PASS')<span class="badge b-pass">Tamam</span>@elseif ($b['status'] === 'WAIT')<span class="badge b-warn">Bekliyor</span>@else<span class="badge b-bad">Engelli</span>@endif</td>
                 <td class="muted">{{ $b['detail'] }}</td>
                 <td>{{ $b['action'] ?? '—' }}</td>
             </tr>

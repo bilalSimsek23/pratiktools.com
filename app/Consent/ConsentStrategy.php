@@ -120,7 +120,7 @@ final class ConsentStrategy
         $ageHours = $applied === null ? null : max(0, round(CarbonImmutable::parse((string) $applied->period_end, 'UTC')->addDay()->diffInMinutes(CarbonImmutable::now(), true) / 60, 1));
         $stale = $maxAge !== null && $ageHours !== null && $ageHours > $maxAge;
         $blocker = match (true) {
-            ! $via->configured() => 'VIA_NOT_CONFIGURED',
+            ! $via->configured() => (string) $via->blocker(),
             $maxAge === null => 'IYS_RECONCILIATION_POLICY_MISSING',
             $applied === null => 'IYS_RECONCILIATION_MISSING',
             $stale => 'IYS_RECONCILIATION_STALE',
@@ -160,7 +160,7 @@ final class ConsentStrategy
             'blocker' => $c['blocker'],
             'source_label' => $mode === ConsentStrategyMode::DirectApi ? 'İYS API' : 'ViA + İYS mutabakatı',
             'direct_api' => ['available' => $mode === ConsentStrategyMode::DirectApi ? $c['direct'] : $this->directApiAvailable(), 'required' => $mode === ConsentStrategyMode::DirectApi],
-            'via' => ['state' => $c['via']->state, 'configured' => $c['via']->configured(), 'detail' => $c['via']->detail],
+            'via' => ['state' => $c['via']->state, 'configured' => $c['via']->configured(), 'detail' => $c['via']->detail, 'level' => $c['via']->level()],
             'reconciliation' => [
                 'max_age_hours' => $c['max_age'],
                 'format_configured' => is_string(config('consent.reconciliation.format')) && isset(config('consent.reconciliation.parsers')[config('consent.reconciliation.format')]),

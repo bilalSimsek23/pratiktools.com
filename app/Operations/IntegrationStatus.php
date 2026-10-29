@@ -5,6 +5,9 @@ namespace App\Operations;
 use App\Consent\ConsentStrategy;
 use App\Consent\SendEligibility;
 use App\Consent\Sync\ConsentSynchronizer;
+use App\Consent\Via\ViaConfigurations;
+use App\Consent\Via\ViaConsentProvider;
+use App\Consent\Via\ViaStatus;
 use App\Email\EmailSendGuard;
 use App\Email\UnsubscribeTokens;
 use App\Push\PushSendGuard;
@@ -24,7 +27,46 @@ final class IntegrationStatus
         private readonly PushSendGuard $push,
         private readonly UnsubscribeTokens $unsubscribe,
         private readonly ConsentStrategy $strategy,
+        private readonly ViaConfigurations $via,
+        private readonly ViaConsentProvider $viaProvider,
     ) {}
+
+    /**
+     * İYS ViA: what is recorded about the form (Form ID masked) and whether
+     * it may be used for production consent acquisition.
+     *
+     * @return array<string, mixed>
+     */
+    private function via(): array
+    {
+        $c = $this->via->current();
+        $s = $this->viaProvider->status();
+
+        return [
+            'configured' => $c !== null,
+            'iys_number' => $c?->iysNumber,
+            'brand' => $c?->brand,
+            'package_status' => $c->packageStatus ?? null,
+            'form_type' => $c?->formType,
+            'approval_type' => $c?->approvalType,
+            'form_status' => $c?->formStatus->value,
+            'form_status_label' => $c?->formStatus->label(),
+            'next_form_statuses' => $c === null ? [] : array_map(fn ($st) => $st->value, $c->formStatus->next()),
+            'form_id_masked' => $c?->maskedFormId(),
+            'state' => $s->state,
+            'level' => $s->level(),
+            'blocker' => $s->blocker(),
+            'detail' => $s->detail,
+            'integration_status' => match ($s->state) {
+                ViaStatus::CONFIGURED => 'ready',
+                ViaStatus::NOT_CONFIGURED => 'not_configured',
+                ViaStatus::FORM_DRAFT, ViaStatus::FORM_PENDING_APPROVAL => 'waiting_iys_approval',
+                ViaStatus::TRANSPORT_NOT_CONFIGURED => 'waiting_specification',
+                default => 'blocked',
+            },
+            'acquisition_allowed' => $s->configured(),
+        ];
+    }
 
     /**
      * @return array<string, array<string, mixed>>
@@ -75,6 +117,7 @@ final class IntegrationStatus
                 'freshness_limit_hours' => (int) config('consent.eligibility.iys_max_age_hours'),
                 'strategy' => $this->strategy->state(),
             ],
+            'via' => $this->via(),
         ];
     }
 }

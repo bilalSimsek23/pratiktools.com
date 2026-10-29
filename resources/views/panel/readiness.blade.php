@@ -8,11 +8,12 @@
     <ul class="readiness">
         @foreach ($blockers as $b)
             <li>
-                <span class="ricon {{ $b['status'] === 'PASS' ? 'pass' : 'bad' }}">{{ $b['status'] === 'PASS' ? '✓' : '✕' }}</span>
+                @php([$ic, $sym, $bc, $bl] = ['PASS' => ['pass', '✓', 'b-pass', 'Tamam'], 'WAIT' => ['warn', '…', 'b-warn', 'Bekliyor']][$b['status']] ?? ['bad', '✕', 'b-bad', 'Engelli'])
+                <span class="ricon {{ $ic }}">{{ $sym }}</span>
                 <div><div class="title">{{ \Illuminate\Support\Str::of($b['blocker'])->replace('_', ' ')->title() }}</div>
                     <div class="why">{{ $b['detail'] }}</div>
                     @if ($b['status'] !== 'PASS' && $b['action'])<div class="todo">→ {{ $b['action'] }}</div>@endif</div>
-                <span class="badge {{ $b['status'] === 'PASS' ? 'b-pass' : 'b-bad' }}">{{ $b['status'] === 'PASS' ? 'Tamam' : 'Engelli' }}</span>
+                <span class="badge {{ $bc }}">{{ $bl }}</span>
             </li>
         @endforeach
     </ul>

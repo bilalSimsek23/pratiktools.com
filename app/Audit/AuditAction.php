@@ -76,6 +76,8 @@ enum AuditAction: string
     case LeadFormConsentChanged = 'lead_form.consent_text_changed';
     case LeadFormConsentModeChanged = 'lead_form.consent_mode_changed';
     case ConsentStrategyChanged = 'consent.strategy_changed';
+    case ViaConfigured = 'consent.via_configured';
+    case ViaFormStatusChanged = 'consent.via_form_status_changed';
     case ViaConsentCompleted = 'consent.via_completed';
     case ViaConsentFailed = 'consent.via_failed';
     case ViaRetCompleted = 'consent.via_ret_completed';

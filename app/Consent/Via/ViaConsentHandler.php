@@ -22,6 +22,9 @@ use Illuminate\Support\Facades\DB;
  *   never taken from the event.
  * - Idempotent: a reference completes once and a ViA transaction id is
  *   used once; repeats change nothing and return "duplicate".
+ * - Every official answer is stored with its provenance (VIA, IYS_VIA,
+ *   form type and ID, approval type, channel, status, provider reference,
+ *   occurred and recorded time).
  * - Consent success: official ONAY (source VIA) and, for newsletter
  *   requests, the NEWSLETTER_SUBSCRIBED event — only now, not at form
  *   submission. If the address is locally blocked (unsubscribe,
@@ -78,9 +81,10 @@ final class ViaConsentHandler
             return 'failed';
         }
 
+        $frame = $this->via->frame();
         $this->consents->observe((string) $request->recipient_id, $event->channel, $event->recipientType, ConsentSourceProvider::Via, ConsentStatus::Granted,
-            $event->occurredAt, 'via:'.$event->transactionId, source: 'VIA_FRAME', consentDate: $event->occurredAt, externalId: $event->transactionId,
-            metadata: ['via_reference' => $event->reference], evidence: ['via_transaction_id' => $event->transactionId, 'via_reference' => $event->reference, 'form_id' => $request->form_id]);
+            $event->occurredAt, 'via:'.$event->transactionId, source: 'VIA_'.($frame->formType ?? 'FORM'), consentDate: $event->occurredAt, externalId: $event->transactionId,
+            metadata: ['via_reference' => $event->reference], evidence: $this->provenance($event, $frame) + ['lead_form_id' => $request->form_id]);
         DB::table('via_consent_requests')->where('tenant_id', $tenantId)->where('id', $request->id)
             ->update(['state' => 'succeeded', 'provider_transaction_id' => $event->transactionId, 'completed_at' => now()]);
 
@@ -119,12 +123,28 @@ final class ViaConsentHandler
         }
 
         $this->consents->observe((string) $intent->recipient_id, $event->channel, $event->recipientType, ConsentSourceProvider::Via, ConsentStatus::Revoked,
-            $event->occurredAt, 'via:'.$event->transactionId, source: 'VIA_RET', externalId: $event->transactionId, metadata: ['via_reference' => $event->reference]);
+            $event->occurredAt, 'via:'.$event->transactionId, source: 'VIA_RET', externalId: $event->transactionId, metadata: ['via_reference' => $event->reference],
+            evidence: $this->provenance($event, $this->via->frame()));
         DB::table('consent_write_intents')->where('tenant_id', $tenantId)->where('id', $intent->id)
             ->update(['state' => 'confirmed', 'confirmed_at' => now(), 'last_error' => null, 'updated_at' => now()]);
         $this->audit->record(AuditAction::ViaRetCompleted, 'consent_write_intent', $intent->id, [], $actor);
 
         return 'applied';
+    }
+
+    /**
+     * Where an official ViA answer came from (stored with the consent).
+     *
+     * @return array<string, string>
+     */
+    private function provenance(ViaConsentEvent $event, ?ViaFrameConfig $frame): array
+    {
+        return [
+            'source' => 'VIA', 'provider' => 'IYS_VIA', 'form_type' => (string) ($frame->formType ?? ''), 'form_id' => (string) ($frame->frameId ?? ''),
+            'approval_type' => (string) ($frame->approvalType ?? ''), 'channel' => $event->channel->value, 'status' => $event->kind === ViaConsentEvent::RET ? 'RET' : 'ONAY',
+            'provider_reference' => $event->transactionId, 'via_reference' => $event->reference,
+            'occurred_at' => $event->occurredAt->toIso8601String(), 'recorded_at' => now()->toIso8601String(),
+        ];
     }
 
     private static function code(?string $code): string

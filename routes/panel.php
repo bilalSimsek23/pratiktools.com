@@ -81,6 +81,7 @@ Route::middleware('auth:web')->group(function () {
         Route::get('leads', [LeadFormController::class, 'leads'])->name('leads');
 
         Route::get('integrations', [OperationsController::class, 'integrations'])->name('integrations');
+        Route::post('integrations/via/form-status', [OperationsController::class, 'viaFormStatus'])->middleware(PanelRecentAuth::class)->name('integrations.via-status');
         Route::get('readiness', [OperationsController::class, 'readiness'])->name('readiness');
         Route::get('suppressions', [OperationsController::class, 'suppressions'])->name('suppressions');
         Route::get('iys/reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation');

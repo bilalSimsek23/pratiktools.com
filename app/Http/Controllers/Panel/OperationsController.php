@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Commerce\Sync\CommerceRelink;
+use App\Consent\Via\ViaConfigurations;
+use App\Consent\Via\ViaFormStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Panel\Concerns\PanelHelpers;
 use App\Notifications\TenantNotifications;
@@ -27,8 +29,26 @@ final class OperationsController extends Controller
         $this->authorizePanel(Permission::IntegrationsView);
         $s = $status->all();
 
-        return view('panel.integrations', ['s' => $s, 'blockers' => collect($blockers->all($s))->keyBy('blocker'),
+        return view('panel.integrations', ['s' => $s, 'blockers' => collect($blockers->all($s))->keyBy('blocker'), 'canManageVia' => $this->can(Permission::IntegrationsManage),
             'cart' => rescue(fn () => app(CommerceRelink::class)->report(), null, false)]);
+    }
+
+    /**
+     * Records the ViA form status seen in the İYS portal (audited). Approval
+     * needs the explicit portal confirmation and never enables consent
+     * acquisition by itself.
+     */
+    public function viaFormStatus(Request $request, ViaConfigurations $via): RedirectResponse
+    {
+        $this->authorizePanel(Permission::IntegrationsManage);
+        $d = $request->validate(['status' => 'required|in:pending_approval,approved,rejected,disabled', 'note' => 'required|string|max:255', 'portal_confirmed' => 'nullable|boolean']);
+        try {
+            $via->setFormStatus(ViaFormStatus::from($d['status']), $this->actor(), $d['note'], (bool) ($d['portal_confirmed'] ?? false));
+        } catch (InvalidArgumentException $e) {
+            return $this->failed($e->getMessage());
+        }
+
+        return $this->done('ViA form durumu güncellendi.');
     }
 
     public function readiness(IntegrationStatus $status, ExternalBlockers $blockers): View

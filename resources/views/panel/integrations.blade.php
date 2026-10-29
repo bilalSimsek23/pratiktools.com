@@ -5,7 +5,7 @@
     $when = fn ($t) => $t ? \Illuminate\Support\Carbon::parse($t)->diffForHumans() : '—';
     $conn = fn (array $i) => ! $i['configured'] ? ['b-bad', 'Bağlı değil'] : ($i['connected'] ? ['b-pass', 'Bağlı'] : ['b-warn', $i['status']]);
     $ses = $s['amazon_ses']; $os = $s['onesignal']; $iys = $s['iys']; $tcx = $s['ticimax'];
-    $blocked = fn (string ...$keys) => array_values(array_filter(array_map(fn ($k) => ($blockers[$k]['status'] ?? 'PASS') === 'BLOCKED' ? $blockers[$k] : null, $keys)));
+    $blocked = fn (string ...$keys) => array_values(array_filter(array_map(fn ($k) => ($blockers[$k]['status'] ?? 'PASS') !== 'PASS' ? $blockers[$k] : null, $keys)));
     $cards = [
         ['Ticimax', 'E-ticaret verisi (müşteri, sipariş, sepet, ürün) — salt okunur', $tcx, [
             'Sağlık' => ($tcx['last_error'] ?? null) ? 'Son hata: '.$tcx['last_error'] : ($tcx['configured'] ? 'Sorun yok' : 'Bağlantı yok'),
@@ -53,6 +53,40 @@
             @endif
         </div>
     @endforeach
+</div>
+@php($via = $s['via'])
+<div class="card stack-top" id="via">
+    @php([$vcls, $vlabel] = ['PASS' => ['b-pass', 'Hazır'], 'WAIT' => ['b-warn', 'Bekliyor']][$via['level']] ?? ['b-bad', 'Engelli'])
+    <div class="split"><div><h2>İYS ViA</h2><div class="small muted">ViA OTP ile ETK izni alma — İYS'nin resmî teknik bilgileri gelene kadar bağlantı kapalı</div></div><span class="badge {{ $vcls }}">{{ $vlabel }}</span></div>
+    @if ($via['configured'])
+        @php($integrationLabels = ['ready' => 'Hazır', 'waiting_iys_approval' => 'İYS onayı bekleniyor', 'waiting_specification' => 'İYS teknik dokümanı bekleniyor', 'blocked' => 'Engelli', 'not_configured' => 'Yapılandırılmadı'])
+        <ul class="list-plain small stack-top">
+            <li class="split"><span class="muted">Hizmet sağlayıcı</span><span>İYS No {{ $via['iys_number'] ?? '—' }} · Marka {{ $via['brand'] ?? '—' }}</span></li>
+            <li class="split"><span class="muted">Paket</span><span>{{ $via['package_status'] === 'active' ? 'Aktif' : ($via['package_status'] === 'inactive' ? 'Pasif' : 'Bilinmiyor') }}</span></li>
+            <li class="split"><span class="muted">Form tipi</span><span>{{ $via['form_type'] }}</span></li>
+            <li class="split"><span class="muted">Onay tipi</span><span>{{ $via['approval_type'] }}</span></li>
+            <li class="split"><span class="muted">Form ID</span><span><code>{{ $via['form_id_masked'] ?? 'Tanımlı değil' }}</code></span></li>
+            <li class="split"><span class="muted">Form durumu</span><span>{{ $via['form_status_label'] }}</span></li>
+            <li class="split"><span class="muted">Teknik entegrasyon</span><span>{{ $integrationLabels[$via['integration_status']] ?? $via['integration_status'] }}</span></li>
+            <li class="split"><span class="muted">Production izin toplama</span>@if ($via['acquisition_allowed'])<span class="badge b-pass">Açık</span>@else<span class="badge b-bad">Kapalı</span>@endif</li>
+        </ul>
+        @unless ($via['acquisition_allowed'])<p class="small"><strong>{{ $via['detail'] }}</strong></p>@endunless
+        @if ($canManageVia && $via['next_form_statuses'] !== [])
+            @php($statusLabels = ['pending_approval' => 'Onaya gönderildi', 'approved' => 'Onaylandı', 'rejected' => 'Reddedildi', 'disabled' => 'Devre dışı'])
+            <form method="post" action="{{ route('panel.integrations.via-status') }}" class="form-grid stack-top">@csrf
+                <label>Form durumunu güncelle (İYS portalında gördüğünüz duruma göre)
+                    <select name="status">@foreach ($via['next_form_statuses'] as $st)<option value="{{ $st }}">{{ $statusLabels[$st] ?? $st }}</option>@endforeach</select></label>
+                <label>Not <input type="text" name="note" maxlength="255" required placeholder="Örn. İYS portalında onay ekranı görüldü"></label>
+                @if (in_array('approved', $via['next_form_statuses'], true))
+                    <label class="small"><input type="checkbox" name="portal_confirmed" value="1"> Formun İYS portalında "Onaylandı" durumunda olduğunu gördüm.</label>
+                @endif
+                <div class="actions"><button class="btn" type="submit">Durumu kaydet</button></div>
+                <p class="hint">Onaylandı olarak işaretlemek tek başına izin toplamayı açmaz: İYS'nin resmî teknik entegrasyonu da gerekir. İşlem denetim kaydına yazılır.</p>
+            </form>
+        @endif
+    @else
+        <p class="muted stack-top">ViA yapılandırılmadı. Operatör: <code>php artisan consent:via</code></p>
+    @endif
 </div>
 @if ($cart)
 <div class="card stack-top">

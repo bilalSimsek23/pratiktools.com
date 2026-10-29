@@ -11,6 +11,26 @@ final class ExternalBlockers
     public function __construct(private readonly IntegrationStatus $integrations) {}
 
     /**
+     * İYS ViA, shown once a ViA form is recorded or the strategy needs it.
+     * WAIT: an external step (İYS approval, official specification) is
+     * pending; it blocks live sending like BLOCKED.
+     *
+     * @param  array<string, array<string, mixed>>  $s
+     * @return list<array{blocker: string, status: string, detail: string, action: ?string}>
+     */
+    private function via(array $s): array
+    {
+        $via = (array) ($s['via'] ?? []);
+        if (! ($via['configured'] ?? false) && ($s['iys']['strategy']['strategy'] ?? 'direct_api') !== 'via_reconciliation') {
+            return [];
+        }
+        $level = (string) ($via['level'] ?? 'BLOCKED');
+
+        return [['blocker' => 'IYS_VIA', 'status' => $level, 'detail' => (string) ($via['detail'] ?? ''),
+            'action' => $level === 'PASS' ? null : ReadinessCatalog::explain($via['blocker'] ?? null)['action']]];
+    }
+
+    /**
      * The İYS row follows the tenant's consent strategy: with
      * via_reconciliation the İYS API is not required, ViA + a fresh applied
      * change report are.
@@ -47,6 +67,7 @@ final class ExternalBlockers
 
         return [
             $this->iys($s['iys'] ?? [], $row),
+            ...$this->via($s),
             $row('SES_PRODUCTION_ACCESS', ($s['amazon_ses']['production_access'] ?? null) === true,
                 ($s['amazon_ses']['production_access'] ?? null) === null ? 'Account status unknown' : 'Sandbox (production access not granted)', 'Wait for AWS SES production access.'),
             $row('EMAIL_UNSUBSCRIBE_KEY', ($s['amazon_ses']['unsubscribe_key'] ?? 'MISSING') === 'CONFIGURED', (string) ($s['amazon_ses']['unsubscribe_key'] ?? 'MISSING'),
