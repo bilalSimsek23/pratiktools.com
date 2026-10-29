@@ -41,7 +41,7 @@
     <div class="wrap footer-grid">
         <div>
             <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span>PratikTools</a>
-            <p class="muted small">E-ticaret entegrasyonu, otomasyon ve yapay zeka çözümleri.</p>
+            <p class="muted small">Yazılım, otomasyon, yapay zekâ ve medya teknolojileri çözümleri.</p>
             @if ($org['email'])<p class="small"><a href="mailto:{{ $org['email'] }}" data-track="contact_click">{{ $org['email'] }}</a></p>@endif
             @if ($org['phone'])<p class="small"><a href="tel:{{ preg_replace('/[^0-9+]/', '', $org['phone']) }}" data-track="contact_click">{{ $org['phone'] }}</a></p>@endif
         </div>

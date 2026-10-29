@@ -216,6 +216,12 @@ final class SiteContents
 
                 return ['title' => $title, 'text' => $text];
             }, $lines($value)), 0, 8),
+            'cards' => array_slice(array_values(array_filter(array_map(function ($l) {
+                [$title, $text, $link] = array_pad(array_map('trim', explode('|', $l, 3)), 3, '');
+
+                return $title === '' ? null : ['title' => mb_substr($title, 0, 80), 'text' => mb_substr($text, 0, 240),
+                    'link' => preg_match('~^/[a-z0-9/_#-]{0,200}$~', $link) === 1 ? $link : ''];
+            }, $lines($value)))), 0, 12),
             'faq' => array_slice(array_values(array_filter(array_map(function ($block) use ($max) {
                 $rows = array_values(array_filter(array_map('trim', preg_split('/\R/u', $block) ?: []), fn ($l) => $l !== ''));
 
@@ -235,6 +241,7 @@ final class SiteContents
         return match ($f['kind']) {
             'list' => implode("\n", (array) $value),
             'steps' => implode("\n", array_map(fn ($s) => ($s['title'] ?? '').' | '.($s['text'] ?? ''), (array) $value)),
+            'cards' => implode("\n", array_map(fn ($c) => ($c['title'] ?? '').' | '.($c['text'] ?? '').' | '.($c['link'] ?? ''), (array) $value)),
             'faq' => implode("\n\n", array_map(fn ($q) => ($q['q'] ?? '')."\n".($q['a'] ?? ''), (array) $value)),
             'bool' => $value ? '1' : '',
             default => is_scalar($value) ? (string) $value : '',

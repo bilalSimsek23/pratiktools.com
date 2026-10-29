@@ -4,16 +4,16 @@
 <section class="hero">
     <div class="wrap hero-grid">
         <div>
-            <p class="eyebrow">Entegrasyon · Otomasyon · Yapay Zeka</p>
+            <p class="eyebrow">Yazılım · Otomasyon · Yapay Zekâ · Medya Teknolojileri</p>
             <h1>{{ $d['hero_title'] ?? $page['title'] }}</h1>
             <p class="lead">{{ $d['hero_text'] ?? $page['excerpt'] }}</p>
             <div class="actions"><a class="btn btn-primary" href="/iletisim">Projenizi anlatın</a><a class="btn" href="/hizmetler">Hizmetleri inceleyin</a></div>
         </div>
         <div class="hero-panel" aria-hidden="true">
             <div class="flow"><span>Ticimax</span><i></i><span>Nebim V3</span></div>
-            <div class="flow"><span>Pazaryerleri</span><i></i><span>Raporlama</span></div>
             <div class="flow"><span>Müşteri verisi</span><i></i><span>E-posta · Push</span></div>
-            <div class="flow"><span>Operasyon</span><i></i><span>Yapay zeka</span></div>
+            <div class="flow"><span>Şablon + veri</span><i></i><span>Render kuyruğu</span></div>
+            <div class="flow"><span>Operasyon</span><i></i><span>Yapay zekâ</span></div>
         </div>
     </div>
 </section>
@@ -21,6 +21,17 @@
 <section class="section wrap" aria-labelledby="yetkinlikler">
     <h2 id="yetkinlikler">Neler yapıyoruz</h2>
     @if (! empty($d['capabilities_intro']))<p class="section-lead">{{ $d['capabilities_intro'] }}</p>@endif
+    @if (! empty($d['capability_cards']))
+        <div class="main-cards">
+            @foreach ($d['capability_cards'] as $card)
+                <article class="main-card">
+                    <h3>@if ($card['link'] !== '')<a href="{{ $card['link'] }}">{{ $card['title'] }}</a>@else{{ $card['title'] }}@endif</h3>
+                    @if ($card['text'] !== '')<p>{{ $card['text'] }}</p>@endif
+                </article>
+            @endforeach
+        </div>
+        <h3 class="sub-head">Tüm hizmet alanları</h3>
+    @endif
     <div class="cap-grid">
         @foreach ($categories as $c)
             <a class="cap" href="{{ count($c['services']) === 1 ? $c['services'][0]['url'] : '/hizmetler#'.$c['slug'] }}">

@@ -39,6 +39,86 @@ final class InitialContent
         'marketing-automation' => 'Marketing Automation', 'iys' => 'İYS', 'api' => 'API', 'teknik-seo' => 'Teknik SEO',
     ];
 
+    /**
+     * Current home page starting values (F7.5 + media catalog).
+     */
+    public const HOME = [
+        'seo_title' => 'PratikTools — Yazılım, Otomasyon, Yapay Zekâ ve Medya Teknolojileri',
+        'seo_description' => 'E-ticaret ve ERP entegrasyonu, pazarlama otomasyonu, yapay zekâ iş akışları, medya prodüksiyon otomasyonu ve özel yazılım ile tekrar eden işleri otomatikleştiriyoruz.',
+        'excerpt' => 'İş süreçlerini yazılım, otomasyon ve yapay zekâyla daha hızlı çalışan sistemlere dönüştürüyoruz.',
+        'hero_title' => 'İş süreçlerini yazılım, otomasyon ve yapay zekâyla daha hızlı çalışan sistemlere dönüştürüyoruz.',
+        'hero_text' => 'E-ticaretten medya prodüksiyonuna, ERP entegrasyonlarından yapay zekâ uygulamalarına kadar; tekrar eden işleri otomatikleştiren, sistemleri birbirine bağlayan ve işletmenize özel dijital çözümler geliştiriyoruz.',
+        'capabilities_intro' => 'Tek bir ürün satmıyoruz; sistemleriniz ve süreçleriniz arasındaki boşlukları kapatan yazılımlar geliştiriyoruz. Başlıca çalışma alanlarımız:',
+        'capability_cards' => [
+            ['title' => 'E-Ticaret & ERP', 'text' => 'Ticimax, Nebim V3 ve pazaryerleri arasında ürün, stok, fiyat ve sipariş akışları.', 'link' => '/cozumler/e-ticaret-otomasyonu'],
+            ['title' => 'Pazarlama Otomasyonu', 'text' => 'Segmentler, otomatik akışlar, izin kontrollü e-posta ve push.', 'link' => '/hizmetler/pazarlama-otomasyonu'],
+            ['title' => 'Yapay Zeka & İş Akışı', 'text' => 'Şirket verisine bağlı, insan onaylı ve denetlenebilir yapay zekâ akışları.', 'link' => '/hizmetler/yapay-zeka-ve-is-sureci-otomasyonu'],
+            ['title' => 'Medya Teknolojileri & Prodüksiyon Otomasyonu', 'text' => 'After Effects ve Premiere Pro otomasyonları, toplu içerik üretimi, render otomasyonu ve render farm.', 'link' => '/cozumler/video-produksiyon-otomasyonu'],
+            ['title' => 'Özel Yazılım & API', 'text' => 'Hazır çözümü olmayan süreçler için özel uygulamalar ve entegrasyonlar.', 'link' => '/hizmetler/api-ozel-entegrasyon'],
+            ['title' => 'Veri & Raporlama', 'text' => 'Dağınık veriyi birleştiren raporlar, dashboard\'lar ve uyarılar.', 'link' => '/hizmetler#veri-ve-raporlama'],
+        ],
+        'integrations' => ['Ticimax', 'Nebim V3', 'Trendyol ve diğer pazaryerleri', 'Amazon Web Services (SES)', 'OneSignal', 'İYS / ViA', 'Adobe After Effects', 'Adobe Premiere Pro',
+            'Google Search Console', 'Google Analytics', 'Meta', 'PostgreSQL', 'Laravel'],
+    ];
+
+    /**
+     * The first (F7.5) home values: replaced by upgradeHome() only where the
+     * panel never changed them.
+     */
+    private const HOME_V1 = [
+        'seo_title' => 'PratikTools — E-Ticaret Entegrasyonu, Otomasyon ve Yapay Zeka',
+        'seo_description' => 'Ticimax, Nebim V3, pazaryerleri, e-posta, push ve İYS için entegrasyon ve otomasyon; yapay zeka ile iş süreçleri. İşletmenizin gerçek sistemlerine bağlı çözümler.',
+        'excerpt' => 'E-ticaret, otomasyon ve yapay zekayı işletmenizin gerçek sistemlerine bağlıyoruz.',
+        'hero_title' => 'E-ticaret, otomasyon ve yapay zekayı işletmenizin gerçek sistemlerine bağlıyoruz.',
+        'hero_text' => 'Ticimax, Nebim V3, pazaryerleri, e-posta ve push altyapıları arasında veriyi doğru, izlenebilir ve güvenli şekilde taşıyan entegrasyonlar; elle yapılan işleri azaltan otomasyonlar ve gerçek veriye dayanan yapay zeka uygulamaları geliştiriyoruz.',
+        'capabilities_intro' => 'Tek bir ürün satmıyoruz; sistemleriniz arasındaki boşlukları kapatan yazılımlar geliştiriyoruz. Başlıca çalışma alanlarımız:',
+        'integrations' => ['Ticimax', 'Nebim V3', 'Trendyol ve diğer pazaryerleri', 'Amazon Web Services (SES)', 'OneSignal', 'İYS / ViA', 'Google Search Console', 'Google Analytics', 'Meta', 'PostgreSQL', 'Laravel'],
+    ];
+
+    /**
+     * Moves the home page to the current starting values field by field,
+     * only where it still holds the first values (panel edits win). Adds the
+     * service cards only when the page has none.
+     *
+     * @return array{updated: list<string>, kept: list<string>}
+     */
+    public static function upgradeHome(): array
+    {
+        $row = DB::table('site_contents')->where('type', 'page')->where('slug', 'home')->first();
+        if ($row === null) {
+            return ['updated' => [], 'kept' => ['home page missing']];
+        }
+        $data = (array) json_decode((string) $row->data, true);
+        $updated = $kept = [];
+        $columns = [];
+        foreach (['seo_title', 'seo_description', 'excerpt'] as $col) {
+            if ((string) $row->{$col} === self::HOME_V1[$col]) {
+                $columns[$col] = self::HOME[$col];
+                $updated[] = $col;
+            } elseif ((string) $row->{$col} !== self::HOME[$col]) {
+                $kept[] = $col;
+            }
+        }
+        foreach (['hero_title', 'hero_text', 'capabilities_intro', 'integrations'] as $key) {
+            if (($data[$key] ?? null) === self::HOME_V1[$key]) {
+                $data[$key] = self::HOME[$key];
+                $updated[] = $key;
+            } elseif (($data[$key] ?? null) !== self::HOME[$key]) {
+                $kept[] = $key;
+            }
+        }
+        if (empty($data['capability_cards'])) {
+            $data['capability_cards'] = self::HOME['capability_cards'];
+            $updated[] = 'capability_cards';
+        }
+        if ($updated !== []) {
+            DB::table('site_contents')->where('id', $row->id)->update($columns + ['data' => json_encode($data, JSON_UNESCAPED_UNICODE), 'updated_at' => now(), 'updated_by' => 'system:initial-content']);
+            SiteContents::bump();
+        }
+
+        return ['updated' => $updated, 'kept' => $kept];
+    }
+
     public const CASE_STUDY_DRAFTS = [
         'ticimax-nebim-v3-entegrasyonu' => 'Ticimax + Nebim V3 entegrasyonu',
         'stok-ve-urun-senkronizasyonu' => 'Stok ve ürün senkronizasyonu',
@@ -97,6 +177,7 @@ final class InitialContent
                 'created_by' => 'system:initial-content', 'updated_by' => 'system:initial-content', 'created_at' => $now, 'updated_at' => $now]);
             $created++;
         }
+        $created += MediaCatalog::install();
         SiteContents::bump();
 
         return $created;
@@ -137,14 +218,13 @@ final class InitialContent
     {
         return [
             ['type' => 'page', 'slug' => 'home', 'title' => 'PratikTools',
-                'seo_title' => 'PratikTools — E-Ticaret Entegrasyonu, Otomasyon ve Yapay Zeka',
-                'seo_description' => 'Ticimax, Nebim V3, pazaryerleri, e-posta, push ve İYS için entegrasyon ve otomasyon; yapay zeka ile iş süreçleri. İşletmenizin gerçek sistemlerine bağlı çözümler.',
-                'excerpt' => 'E-ticaret, otomasyon ve yapay zekayı işletmenizin gerçek sistemlerine bağlıyoruz.',
+                'seo_title' => self::HOME['seo_title'], 'seo_description' => self::HOME['seo_description'], 'excerpt' => self::HOME['excerpt'],
                 'data' => [
-                    'hero_title' => 'E-ticaret, otomasyon ve yapay zekayı işletmenizin gerçek sistemlerine bağlıyoruz.',
-                    'hero_text' => 'Ticimax, Nebim V3, pazaryerleri, e-posta ve push altyapıları arasında veriyi doğru, izlenebilir ve güvenli şekilde taşıyan entegrasyonlar; elle yapılan işleri azaltan otomasyonlar ve gerçek veriye dayanan yapay zeka uygulamaları geliştiriyoruz.',
-                    'capabilities_intro' => 'Tek bir ürün satmıyoruz; sistemleriniz arasındaki boşlukları kapatan yazılımlar geliştiriyoruz. Başlıca çalışma alanlarımız:',
-                    'integrations' => ['Ticimax', 'Nebim V3', 'Trendyol ve diğer pazaryerleri', 'Amazon Web Services (SES)', 'OneSignal', 'İYS / ViA', 'Google Search Console', 'Google Analytics', 'Meta', 'PostgreSQL', 'Laravel'],
+                    'hero_title' => self::HOME['hero_title'],
+                    'hero_text' => self::HOME['hero_text'],
+                    'capabilities_intro' => self::HOME['capabilities_intro'],
+                    'capability_cards' => self::HOME['capability_cards'],
+                    'integrations' => self::HOME['integrations'],
                     'how_we_work' => [
                         ['title' => 'Analiz', 'text' => 'Mevcut sistemleri, veri akışlarını ve elle yapılan işleri birlikte çıkarıyoruz; neyin otomatikleşeceğini ve riskleri netleştiriyoruz.'],
                         ['title' => 'Entegrasyon', 'text' => 'Sistemleri resmi API\'leri üzerinden, hata ve tekrar senaryolarını düşünerek bağlıyoruz; veriyi doğrulayarak taşıyoruz.'],

@@ -9,7 +9,8 @@ namespace App\Site;
  *
  * kinds: text (one line), textarea (plain text), list (one item per line),
  * faq (blocks separated by a blank line: first line question, rest answer),
- * steps (one "Title | text" per line), bool, select.
+ * steps (one "Title | text" per line), cards (one "Title | text | /path"
+ * per line; site-internal paths only), bool, select.
  */
 enum ContentType: string
 {
@@ -104,6 +105,7 @@ enum ContentType: string
                 ['key' => 'hero_title', 'label' => 'Hero başlığı', 'kind' => 'text', 'max' => 160],
                 ['key' => 'hero_text', 'label' => 'Hero metni', 'kind' => 'textarea', 'max' => 600],
                 ['key' => 'capabilities_intro', 'label' => 'Yetkinlikler girişi (ana sayfa)', 'kind' => 'textarea', 'max' => 600],
+                ['key' => 'capability_cards', 'label' => 'Ana hizmet kartları (ana sayfa)', 'kind' => 'cards', 'max' => 300, 'help' => 'Her satır: Başlık | kısa açıklama | /bağlantı (site içi adres).'],
                 ['key' => 'integrations', 'label' => 'Çalışılan platformlar (ana sayfa)', 'kind' => 'list', 'max' => 80],
                 ['key' => 'how_we_work', 'label' => 'Nasıl çalışıyoruz (ana sayfa)', 'kind' => 'steps', 'max' => 400, 'help' => 'Her satır: Başlık | açıklama'],
                 ['key' => 'cta_title', 'label' => 'CTA başlığı', 'kind' => 'text', 'max' => 160],

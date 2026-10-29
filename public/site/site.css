@@ -138,3 +138,10 @@ img { max-width: 100%; height: auto; border-radius: var(--radius); }
 .ref-short { font-weight: 600; color: var(--ink-2); }
 .ref-hero-mark { display: inline-grid; place-items: center; min-height: 64px; margin-bottom: 12px; }
 @media (max-width: 640px) { .ref-row { grid-template-columns: 1fr; } .ref-mark { min-height: 70px; } }
+
+/* Home main service cards (CMS: home › capability_cards) */
+.main-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 20px; }
+.main-card { position: relative; padding: 22px 22px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(180deg, #fff, var(--bg-2)); }
+.main-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; border-radius: var(--radius) 0 0 var(--radius); background: linear-gradient(180deg, var(--brand), var(--accent)); }
+.main-card h3 { margin-bottom: .35em; } .main-card h3 a { color: var(--ink); text-decoration: none; } .main-card h3 a:hover { color: var(--brand); }
+.main-card p { margin: 0; font-size: .95rem; }
