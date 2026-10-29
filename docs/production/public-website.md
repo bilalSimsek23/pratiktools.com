@@ -123,6 +123,34 @@ page_view, service/solution/project/article_view, lead_form_open, lead_submit
 conversion label) / Meta Pixel when configured and consented. Meta Conversions
 API needs a secret (vault) and is not implemented yet.
 
+## Media storage (Laravel Cloud object storage)
+
+- Production bucket: private Laravel Object Storage (Cloudflare R2), attached
+  with disk name **`site-media`**. Laravel Cloud registers that disk and its
+  credentials at runtime; the repository holds no bucket configuration or
+  credentials. Requires `league/flysystem-aws-s3-v3` (Cloud refuses to deploy
+  an app with an attached bucket without it).
+- The website media disk is the saved Site Ayarları choice, else
+  `SITE_MEDIA_DISK`, else `site-media` when that disk exists, else local.
+  Production accepts only a persistent (non-local) disk.
+- The app's **default** disk is pinned to `local` (`APP_FILESYSTEM_DISK`), not
+  Cloud's `FILESYSTEM_DISK`: a bucket marked "Default" in Cloud does not move
+  any implicit storage use to object storage. Website media always name their disk.
+- Delivery: the bucket stays private. `/media/{id}/{width}.{webp|jpg}` reads
+  the object with the disk's credentials and streams it. Keys are
+  `site-media/{media id}/…`; a replaced image gets a new id and URL, so
+  responses are cached as `immutable` for a year without serving stale images.
+  Storage errors answer 503 without details. No per-object public ACL is used
+  (R2 does not support it).
+- Writes are all-or-nothing: every variant is written before the DB row; a
+  failure deletes what was written and stores nothing. Replacing or removing a
+  reference logo switches the reference first, then deletes the old media if
+  nothing else uses it. Unused images can be deleted in Görseller
+  (`site.edit`, recent password); images in use cannot.
+- Smoke test (no secrets printed, nothing left behind):
+  `php artisan site:storage-check` or Site Ayarları › "Depolamayı test et"
+  (`site.settings`): write → exists → read + hash → delete → gone.
+
 ## Settings (source of truth)
 
 All changeable, non-secret site settings are rows in `site_settings`, edited
