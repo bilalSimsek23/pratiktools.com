@@ -159,6 +159,47 @@ passwords are stored only as hashes.
 4. In Site Ayarları: contact details, KVKK URL, analytics ids, GPTBot policy.
 5. Review the starting content; fill in and publish case studies.
 
+## References (Referanslar)
+
+`site_references` ("we worked with") is separate from projects/case studies
+("what we did"); `site_reference_contents` links a reference to any number of
+projects, services and solutions. Everything is managed in
+**/app › Web Sitesi › Referanslar**: add, rename, describe, capabilities,
+website URL, logos (light/dark), linked case studies, homepage on/off and
+order, draft/publish/archive, delete (drafts/archived). No code, deploy or
+migration is ever needed for a change.
+
+Public rules (`/referanslar`, `/referanslar/{slug}`, homepage "Birlikte
+çalıştığımız markalar" + "Seçili çalışmalar"):
+
+- shown only when **published + active + client-name approval recorded**;
+  publishing refuses without that approval;
+- the logo only with a separate **logo-use approval**; otherwise the name is
+  shown as text (an operator decision per reference, never assumed);
+- renaming drops the name approval; a new light logo drops the logo approval;
+- a detail page exists only when there is a description or a published linked
+  case study; otherwise the reference stays in the list;
+- the homepage shows `homepage_featured` references in `featured_order`.
+
+Logos use the same hardened image pipeline (JPEG/PNG/WebP, re-encoded,
+alt text required; SVG not accepted) and need a persistent object storage
+disk in production.
+
+| Permission | owner | admin | marketer | approver |
+|---|---|---|---|---|
+| site.references.view | x | x | x | x |
+| site.references.edit (texts, relations, order, homepage) | x | x | x | |
+| site.references.manage_logo | x | x | x | |
+| site.references.publish (publish, archive, delete) | x | x | | x |
+| site.references.approve_client (name/logo approvals) | x | x | | |
+
+Audited: created, changed, published, archived, deleted, homepage/order
+changed, name approval, logo approval, logo changed.
+
+Starting references (IGS, Dost TV, DKM, N-Extent, MotionCurate, PazarRadar)
+are installed once as drafts, featured in that order, with **no approvals**;
+they appear only after an operator records the approvals and publishes.
+
 ## Starting content
 
 Installed once by a migration (`InitialContent`, only missing slugs):
