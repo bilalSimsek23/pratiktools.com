@@ -92,7 +92,7 @@ final class PublicSiteTest extends TestCase
     public function test_homepage_and_initial_pages_are_public_server_rendered_and_cookie_free(): void
     {
         $home = $this->get('/');
-        $home->assertOk()->assertSee('E-ticaret, otomasyon ve yapay zekayı', false)->assertSee('Neler yapıyoruz')->assertSee('Ticimax Entegrasyonları')
+        $home->assertOk()->assertSee('İş süreçlerini yazılım, otomasyon ve yapay zekâyla', false)->assertSee('Neler yapıyoruz')->assertSee('Ticimax Entegrasyonları')
             ->assertSee('Nasıl çalışıyoruz')->assertSee('Projenizi anlatın')->assertHeader('Cache-Control', 'max-age=300, public');
         $this->assertSame([], $home->headers->getCookies(), 'Public pages set no cookies.');
         $this->assertFalse($home->headers->has('X-Robots-Tag'));
