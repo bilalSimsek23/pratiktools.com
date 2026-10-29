@@ -56,13 +56,14 @@ final class PanelTest extends TestCase
         });
     }
 
-    public function test_root_redirects_to_login_without_a_session_and_to_dashboard_with_one(): void
+    public function test_root_is_the_public_site_and_the_panel_stays_under_app(): void
     {
-        $this->get('/')->assertRedirect(route('panel.dashboard'));
+        // F7.5: the root is the public website (F7 redirected it to /app).
+        $this->get('/')->assertOk()->assertSee('PratikTools')->assertDontSee('Giriş yap');
         $this->get('/app')->assertRedirect(route('panel.login'));
         $this->get('/app/login')->assertOk()->assertSee('Giriş');
 
-        $this->as($this->owner)->get('/')->assertRedirect(route('panel.dashboard'));
+        $this->as($this->owner)->get('/')->assertOk();
         $this->as($this->owner)->get('/app')->assertOk()->assertSee('Genel bakış')->assertSee('Harici engeller');
     }
 
