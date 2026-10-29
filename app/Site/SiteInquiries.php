@@ -176,7 +176,8 @@ final class SiteInquiries
 
     private function leadForm(): ?string
     {
-        $id = config('site.lead_form') ?: (json_decode((string) DB::table('site_settings')->where('key', 'lead_form')->value('value'), true)['public_id'] ?? null);
+        // Saved by site:setup; SITE_LEAD_FORM only as a bootstrap fallback.
+        $id = (json_decode((string) DB::table('site_settings')->where('key', 'lead_form')->value('value'), true)['public_id'] ?? null) ?: config('site.lead_form');
 
         return is_string($id) && preg_match('/^lf_[a-z0-9]{26}$/', $id) === 1 ? $id : null;
     }

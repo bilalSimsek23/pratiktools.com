@@ -1,7 +1,7 @@
 @extends('panel.layout')
 @section('title', 'Site ayarları')
 @section('content')
-<div class="page-head"><div><h1>Web Sitesi · Formlar ve Site Ayarları</h1><p>Analitik sağlayıcıları yalnızca kimlik numarasıyla bağlanır; sayfaya serbest script eklenemez. Sağlayıcılar ziyaretçi çerez onayı vermeden yüklenmez.</p></div></div>
+<div class="page-head"><div><h1>Web Sitesi · Formlar ve Site Ayarları</h1><p>Buradaki ayarlar veritabanında tutulur ve sitenin tek kaynağıdır; ortam değişkenleri yalnız ilk kurulum yedeğidir. Gizli değerler (depolama erişim bilgileri, API anahtarları) burada tutulmaz. Analitik sağlayıcıları yalnızca kimlik numarasıyla bağlanır ve ziyaretçi çerez onayı vermeden yüklenmez.</p></div></div>
 <div class="grid g2">
 <div class="card">
     <h2>Talep formu</h2>
@@ -37,6 +37,30 @@
         <label>Google Ads lead dönüşüm etiketi <input type="text" name="google_ads_lead_label" value="{{ $analytics['google_ads_lead_label'] }}" @disabled(! $canSettings)></label>
         <label>Meta Pixel ID <input type="text" name="meta_pixel_id" value="{{ $analytics['meta_pixel_id'] }}" @disabled(! $canSettings)></label>
         <p class="hint">Meta Conversions API (sunucu tarafı) gizli anahtar gerektirir; kasaya (vault) bağlanan ayrı bir adımla eklenecek.</p>
+        @if ($canSettings)<div class="actions"><button class="btn" type="submit">Kaydet</button></div>@endif
+    </form>
+</div>
+<div class="card">
+    <h2>Site sahibi</h2>
+    <p class="small">Web sitesini bu tenant'ın üyeleri yönetir; web sitesi talepleri bu tenant'ın lead'leri olur. Kaynak:
+        <strong>{{ ['settings' => 'Site ayarları', 'environment' => 'Ortam değişkeni (ilk kurulum yedeği)', 'none' => 'Tanımlı değil'][$owner['source']] }}</strong></p>
+    <form method="post" action="{{ route('panel.website.settings.save', 'owner') }}" class="form-grid">@csrf
+        <label>Tenant (slug) <input type="text" name="tenant" value="{{ $owner['slug'] }}" maxlength="63" required @disabled(! $canSettings)></label>
+        <label class="small"><input type="checkbox" name="confirm" value="1" @disabled(! $canSettings)> Başka bir tenant seçersem bu ekrana erişimimin kalkacağını ve yeni taleplerin o tenant'a gideceğini biliyorum.</label>
+        @if ($canSettings)<div class="actions"><button class="btn" type="submit">Kaydet</button></div>@endif
+    </form>
+</div>
+<div class="card">
+    <h2>Görseller ve önbellek</h2>
+    <form method="post" action="{{ route('panel.website.settings.save', 'media') }}" class="form-grid">@csrf
+        <label>Görsel depolama diski <select name="disk" @disabled(! $canSettings)>
+            @foreach ($disks as $name => $driver)<option value="{{ $name }}" @selected($mediaDisk === $name)>{{ $name }} ({{ $driver }})</option>@endforeach</select></label>
+        <p class="hint">Diskin erişim bilgileri gizli değerdir ve Laravel Cloud ortamında kalır; burada yalnızca hangi diskin kullanılacağı seçilir. Production'da yalnız kalıcı (object storage) diskler kabul edilir.</p>
+        @if (! \App\Site\SiteSettings::persistentDisk($mediaDisk))<p class="small"><span class="badge b-warn">Kalıcı değil</span> Production'da görsel yükleme bu diskle kapalıdır.</p>@endif
+        @if ($canSettings)<div class="actions"><button class="btn" type="submit">Kaydet</button></div>@endif
+    </form>
+    <form method="post" action="{{ route('panel.website.settings.save', 'delivery') }}" class="form-grid stack-top">@csrf
+        <label>Sayfa önbellek süresi (saniye, 0–3600) <input type="number" name="cache_seconds" min="0" max="3600" value="{{ $cacheSeconds }}" @disabled(! $canSettings)></label>
         @if ($canSettings)<div class="actions"><button class="btn" type="submit">Kaydet</button></div>@endif
     </form>
 </div>

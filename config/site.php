@@ -2,22 +2,27 @@
 
 return [
 
-    // Slug of the tenant that owns the public website: its members edit the
-    // site in the panel (Web Sitesi) and website inquiries become its leads.
-    // Empty = nobody can edit the site and inquiries are not accepted.
+    // Changeable site settings live in the database (site_settings, panel:
+    // Web Sitesi › Site Ayarları). The values below are only first-boot
+    // fallbacks used while a setting has never been saved.
+
+    // Owner tenant slug (normally recorded by `site:setup --tenant=`).
     'owner_tenant' => env('SITE_OWNER_TENANT'),
 
-    // Public id (lf_...) of the owner tenant's F6 lead form used by the site.
+    // Public id (lf_...) of the website lead form (normally recorded by site:setup).
     'lead_form' => env('SITE_LEAD_FORM'),
 
     'name' => 'PratikTools',
 
-    // HTML pages: browser/CDN cache seconds.
+    // HTML pages: browser/CDN cache seconds (fallback; setting "delivery").
     'cache_seconds' => (int) env('SITE_CACHE_SECONDS', 300),
 
-    // Uploaded images. Laravel Cloud needs an object storage disk for
-    // uploads to survive deployments (e.g. SITE_MEDIA_DISK=s3).
+    // Image disk (fallback; setting "media"). Production accepts only a
+    // persistent (object storage) disk; its credentials stay in the
+    // environment as secrets.
     'media_disk' => env('SITE_MEDIA_DISK', 'local'),
+
+    // Hard security limits (code, not settings).
     'media_max_bytes' => 5 * 1024 * 1024,
     'media_max_pixels' => 40_000_000,
     'media_widths' => [1600, 800],

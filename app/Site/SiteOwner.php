@@ -5,18 +5,19 @@ namespace App\Site;
 use App\Tenancy\TenantDirectory;
 
 /**
- * The tenant that owns the public website (config site.owner_tenant).
- * None configured: the website cannot be edited and inquiries are refused.
+ * The tenant that owns the public website: the "owner" site setting, or
+ * SITE_OWNER_TENANT only while that setting has never been saved
+ * (bootstrap). None: the website cannot be edited and inquiries are refused.
  */
 final class SiteOwner
 {
-    public function __construct(private readonly TenantDirectory $tenants) {}
+    public function __construct(private readonly TenantDirectory $tenants, private readonly SiteSettings $settings) {}
 
     public function tenantId(): ?string
     {
-        $slug = config('site.owner_tenant');
+        $slug = $this->settings->ownerSlug()['slug'];
 
-        return is_string($slug) && $slug !== '' ? $this->tenants->idBySlug($slug) : null;
+        return $slug === null ? null : $this->tenants->idBySlug($slug);
     }
 
     public function is(?string $tenantId): bool

@@ -98,7 +98,7 @@ Route::middleware('auth:web')->group(function () {
             Route::get('media', [WebsiteController::class, 'media'])->name('media');
             Route::post('media', [WebsiteController::class, 'upload'])->middleware('throttle:20,1')->name('media.upload');
             Route::get('settings', [WebsiteController::class, 'settings'])->name('settings');
-            Route::post('settings/{group}', [WebsiteController::class, 'saveSettings'])->where('group', 'organization|analytics|crawlers')->middleware(PanelRecentAuth::class)->name('settings.save');
+            Route::post('settings/{group}', [WebsiteController::class, 'saveSettings'])->where('group', 'organization|analytics|crawlers|owner|media|delivery')->middleware(PanelRecentAuth::class)->name('settings.save');
             Route::post('categories/{kind}', [WebsiteController::class, 'saveCategory'])->where('kind', 'service|article')->name('categories.save');
             Route::get('content/{content}', [WebsiteController::class, 'edit'])->whereUuid('content')->name('edit');
             Route::post('content/{content}', [WebsiteController::class, 'update'])->whereUuid('content')->name('update');

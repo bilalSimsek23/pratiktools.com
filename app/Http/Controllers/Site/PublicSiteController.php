@@ -116,7 +116,7 @@ final class PublicSiteController extends Controller
             'org' => $this->settings->get('organization'), 'analytics' => $this->analytics->config(),
             'serviceCategories' => $this->site->categories('service'), 'formStamp' => SiteInquiries::stamp(),
             'interests' => $this->inquiries->interests(), 'inquiryAvailable' => $this->inquiries->available(),
-        ], $status)->header('Cache-Control', $status === 200 && ($meta['robots'] ?? '') !== '' ? 'public, max-age='.(int) config('site.cache_seconds') : 'no-store')
+        ], $status)->header('Cache-Control', $status === 200 && ($meta['robots'] ?? '') !== '' ? 'public, max-age='.$this->settings->cacheSeconds() : 'no-store')
             ->header('Referrer-Policy', 'strict-origin-when-cross-origin');
     }
 }

@@ -157,7 +157,7 @@ final class WebsiteController extends Controller
         $this->authorizePanel(Permission::SiteView);
 
         return view('panel.website.media', ['media' => DB::table('site_media')->orderByDesc('created_at')->limit(200)->get(), 'canEdit' => $this->can(Permission::SiteEdit),
-            'ephemeral' => app()->isProduction() && config('site.media_disk') === 'local']);
+            'ephemeral' => ! SiteSettings::persistentDisk(app(SiteSettings::class)->mediaDisk()), 'production' => app()->isProduction()]);
     }
 
     public function upload(Request $request, SiteMedia $media): RedirectResponse
@@ -222,19 +222,23 @@ final class WebsiteController extends Controller
     public function settings(SiteSettings $settings, SiteInquiries $inquiries, TenantContext $context): View
     {
         $this->authorizePanel(Permission::SiteView);
-        $form = json_decode((string) DB::table('site_settings')->where('key', 'lead_form')->value('value'), true)['public_id'] ?? config('site.lead_form');
+        $form = (json_decode((string) DB::table('site_settings')->where('key', 'lead_form')->value('value'), true)['public_id'] ?? null) ?: config('site.lead_form');
 
         return view('panel.website.settings', ['org' => $settings->get('organization'), 'analytics' => $settings->get('analytics'), 'crawlers' => $settings->get('crawlers'),
             'canSettings' => $this->can(Permission::SiteSettings), 'inquiryAvailable' => $inquiries->available(),
             'form' => $form === null ? null : DB::table('lead_forms')->where('tenant_id', $context->requireTenant())->where('public_id', $form)->first(['id', 'name', 'active', 'allowed_origins']),
-            'origin' => SiteInquiries::origin()]);
+            'origin' => SiteInquiries::origin(), 'owner' => $settings->ownerSlug(), 'mediaDisk' => $settings->mediaDisk(), 'cacheSeconds' => $settings->cacheSeconds(),
+            'disks' => collect((array) config('filesystems.disks'))->map(fn ($d) => (string) ($d['driver'] ?? ''))->all()]);
     }
 
     public function saveSettings(Request $request, string $group, SiteSettings $settings): RedirectResponse
     {
         $this->authorizePanel(Permission::SiteSettings);
+        if ($group === 'owner' && ! $request->boolean('confirm')) {
+            return $this->failed('Site sahibini değiştirmek için onay kutusunu işaretleyin.');
+        }
         try {
-            $settings->set($group, $request->except('_token'), $this->actor());
+            $settings->set($group, $request->except(['_token', 'confirm']), $this->actor());
         } catch (SiteError $e) {
             return $this->failed($e->getMessage());
         }

@@ -2,7 +2,7 @@
 @section('title', 'Görseller')
 @section('content')
 <div class="page-head"><div><h1>Web Sitesi · Görseller</h1><p>JPEG, PNG veya WebP; en fazla 5 MB. Yüklenen görsel yeniden kodlanır (WebP + JPEG, iki boyut); konum ve kamera bilgileri silinir.</p></div></div>
-@if ($ephemeral)<div class="card"><p><span class="badge b-warn">Uyarı</span> Görseller yerel diske kaydediliyor; Laravel Cloud'da dağıtımlar arasında kalıcı olmaz. Bir object storage bucket bağlayıp SITE_MEDIA_DISK ayarlayın.</p></div>@endif
+@if ($ephemeral)<div class="card"><p><span class="badge b-warn">Uyarı</span> Seçili depolama diski kalıcı değil{{ $production ? '; production\'da görsel yükleme kapalı' : '' }}. Laravel Cloud'da bir object storage bucket bağlayıp <a href="{{ route('panel.website.settings') }}">Site Ayarları</a>'ndan seçin.</p></div>@endif
 @if ($canEdit)
 <div class="card stack-top">
     <form method="post" action="{{ route('panel.website.media.upload') }}" enctype="multipart/form-data" class="form-grid">@csrf

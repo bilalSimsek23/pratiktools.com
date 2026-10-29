@@ -25,10 +25,14 @@ final class SiteMedia
 {
     private const TYPES = [IMAGETYPE_JPEG => 'image/jpeg', IMAGETYPE_PNG => 'image/png', IMAGETYPE_WEBP => 'image/webp'];
 
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(private readonly AuditLogger $audit, private readonly SiteSettings $settings) {}
 
     public function upload(UploadedFile $file, string $alt, Actor $actor): string
     {
+        $disk = $this->settings->mediaDisk();
+        if (app()->isProduction() && ! SiteSettings::persistentDisk($disk)) {
+            throw new SiteError('Görsel yükleme kapalı: production\'da kalıcı bir object storage diski seçilmeli (Site Ayarları).');
+        }
         $alt = SiteContents::line($alt, 200);
         if ($alt === '') {
             throw new SiteError('Görsel için alternatif metin (alt) gerekli.');
@@ -61,7 +65,6 @@ final class SiteMedia
         }
 
         $id = (string) Str::uuid7();
-        $disk = (string) config('site.media_disk');
         $variants = ['webp' => [], 'jpg' => []];
         foreach (array_unique([...array_filter((array) config('site.media_widths'), fn ($w) => $w < $width), min($width, max((array) config('site.media_widths')))]) as $w) {
             $scaled = $w === $width ? $image : imagescale($image, (int) $w);
