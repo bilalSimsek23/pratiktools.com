@@ -9,7 +9,7 @@ unchanged under `/app`; the API under `/api`.
 |---|---|---|
 | Public pages | `routes/site.php`, `App\Http\Controllers\Site` | No session, no cookie, no tenant context; `Cache-Control: public, max-age=300` |
 | Content | `site_categories`, `site_contents`, `site_content_relations`, `site_media`, `site_settings`, `site_events_daily` | Platform-level marketing content, **no tenant_id, no personal data** |
-| Management | `/app/website/*` (`WebsiteController`) | Only when the panel tenant is `SITE_OWNER_TENANT` (`EnsureSiteOwner`, else 404) |
+| Management | `/app/website/*` (`WebsiteController`) | Only when the panel tenant is the site owner (setting `owner`; `EnsureSiteOwner`, else 404) |
 | Inquiries | `POST /iletisim/talep` → F6 `LeadCapture` + `lead_inquiries` | Tenant data of the owner tenant (FORCE RLS, PII list) |
 
 A public visitor never gets a tenant context, so every tenant table stays
@@ -123,16 +123,41 @@ page_view, service/solution/project/article_view, lead_form_open, lead_submit
 conversion label) / Meta Pixel when configured and consented. Meta Conversions
 API needs a secret (vault) and is not implemented yet.
 
+## Settings (source of truth)
+
+All changeable, non-secret site settings are rows in `site_settings`, edited
+in **/app › Web Sitesi › Formlar ve Site Ayarları** (`site.settings`, recent
+password confirmation, audited):
+
+| Setting | Group | Notes |
+|---|---|---|
+| Owner tenant | `owner` | Changing it needs an explicit confirmation; the previous owner loses access |
+| Contact e-mail, phone, address, profile links, KVKK URL | `organization` | Validated; shown on the site and in schema |
+| GA4, Google Ads (+ lead label), Meta Pixel ids | `analytics` | Ids only, pattern-validated |
+| GPTBot policy | `crawlers` | allow / disallow |
+| Image disk | `media` | One of the configured disks; production accepts only a persistent (object storage) disk |
+| Page cache seconds | `delivery` | 0–3600 |
+| Website lead form | `lead_form` | Written by `site:setup` |
+
+Environment variables (`SITE_OWNER_TENANT`, `SITE_LEAD_FORM`,
+`SITE_MEDIA_DISK`, `SITE_CACHE_SECONDS`) are read only while the
+corresponding setting has never been saved (first boot); normally they stay
+unset. Secrets are never site settings: storage credentials stay in Laravel
+Cloud secrets, API secrets (e.g. Meta Conversions API) in the vault. User
+passwords are stored only as hashes.
+
 ## Operator setup
 
-1. Create the PratikTools tenant and its panel users (`tenant:member`).
-2. `SITE_OWNER_TENANT=<slug>` (Laravel Cloud environment).
-3. `php artisan site:setup --tenant=<slug>` — creates the website lead form
-   (origin = APP_URL) in that tenant.
-4. Attach an object storage bucket and set `SITE_MEDIA_DISK` before uploading
-   images (local disk does not survive deploys).
-5. Review and edit the starting content; fill in the case-study drafts; add
-   contact details, KVKK page URL and analytics ids in Site Ayarları.
+1. Create the PratikTools tenant and its owner:
+   `php artisan tenant:create "PratikTools" pratiktools --owner-email=<email> --owner-name="…"`
+   (password at the hidden prompt, never in the command text).
+2. `php artisan site:setup --tenant=pratiktools` — records the tenant as the site
+   owner and creates the website lead form (origin = APP_URL). Idempotent;
+   refuses if another tenant already owns the site.
+3. Attach an object storage bucket (credentials as Cloud secrets) and select
+   its disk in Site Ayarları before uploading images.
+4. In Site Ayarları: contact details, KVKK URL, analytics ids, GPTBot policy.
+5. Review the starting content; fill in and publish case studies.
 
 ## Starting content
 

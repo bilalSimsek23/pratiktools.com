@@ -132,7 +132,7 @@ are never lifted by it. Reports are uploaded under İYS › Mutabakat: dry-run, 
 `/` is the PratikTools company website (services, solutions/landing pages, projects, blog,
 about, contact), server-rendered without session or cookies; the SaaS panel stays under `/app`.
 Content lives in platform-level `site_*` tables (no tenant data) and is managed in
-`/app › Web Sitesi` by the site-owner tenant (`SITE_OWNER_TENANT`) with separate edit/publish
+`/app › Web Sitesi` by the site-owner tenant (a DB site setting, bootstrapped by `site:setup`) with separate edit/publish
 permissions. Inquiries reuse F6 lead capture in that tenant. Includes SEO meta, canonical,
 Open Graph, sitemap, schema.org JSON-LD, a managed robots.txt (OAI-SearchBot allowed, GPTBot a
 setting) and consent-gated analytics by validated provider ids. See
