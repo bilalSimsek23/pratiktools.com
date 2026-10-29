@@ -14,6 +14,7 @@ use App\Site\SiteContents;
 use App\Site\SiteError;
 use App\Site\SiteInquiries;
 use App\Site\SiteMarkdown;
+use App\Site\SiteMedia;
 use App\Tenancy\TenantRole;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,8 @@ final class PublicSiteTest extends TestCase
     {
         parent::setUp();
         Http::preventStrayRequests();
-        config(['app.url' => self::ORIGIN, 'site.owner_tenant' => 'pratiktools']);
+        // No SITE_OWNER_TENANT: site:setup bootstraps the owner into the DB settings.
+        config(['app.url' => self::ORIGIN, 'site.owner_tenant' => null]);
         [$this->site, $this->owner] = $this->createTenant('pratiktools');
         $this->artisan('site:setup', ['--tenant' => 'pratiktools'])->assertSuccessful();
     }
@@ -258,8 +260,9 @@ final class PublicSiteTest extends TestCase
         $this->inquire(['email' => 'a2@example.com'], $ip)->assertOk();
         $this->inquire(['email' => 'a3@example.com'], $ip)->assertStatus(429);
 
-        // Not set up: refused, nothing stored.
-        config(['site.owner_tenant' => null]);
+        // No owner: refused, nothing stored.
+        DB::table('site_settings')->where('key', 'owner')->delete();
+        SiteContents::bump();
         $this->inquire(['email' => 'b@example.com'])->assertStatus(503);
     }
 
@@ -410,5 +413,59 @@ final class PublicSiteTest extends TestCase
         $this->assertStringContainsString('https://connect.facebook.net', $csp);
         $this->assertStringContainsString('id="pt-consent"', (string) $page->getContent());
         $this->assertStringNotContainsString('gtag(', (string) $page->getContent(), 'No inline provider script; site.js loads it after consent.');
+    }
+
+    public function test_site_settings_live_in_the_database_and_env_is_only_a_bootstrap_fallback(): void
+    {
+        $setting = fn (string $k) => json_decode((string) DB::table('site_settings')->where('key', $k)->value('value'), true);
+        $this->assertSame(['tenant' => 'pratiktools'], $setting('owner'));
+        $forms = $this->inTenant($this->site, fn () => DB::table('lead_forms')->count());
+        $this->artisan('site:setup', ['--tenant' => 'pratiktools'])->assertSuccessful()->expectsOutputToContain('already set up');
+        $this->assertSame($forms, $this->inTenant($this->site, fn () => DB::table('lead_forms')->count()), 'Idempotent.');
+        [$other, $otherOwner] = $this->createTenant('baska');
+        $this->artisan('site:setup', ['--tenant' => 'baska'])->assertFailed();
+
+        // The DB setting wins over the environment; env is used only while nothing is saved.
+        config(['site.owner_tenant' => 'baska']);
+        $this->as($this->owner)->get('/app/website/settings')->assertOk()->assertSee('Site ayarları');
+        DB::table('site_settings')->where('key', 'owner')->delete();
+        SiteContents::bump();
+        $this->as($otherOwner, $other)->get('/app/website/settings')->assertOk()->assertSee('Ortam değişkeni');
+        $this->as($this->owner)->get('/app/website/settings')->assertNotFound();
+        config(['site.owner_tenant' => null]);
+        $this->artisan('site:setup', ['--tenant' => 'pratiktools'])->assertSuccessful();
+
+        // Changing the owner in the panel: confirmation, valid active tenant, audit; the old owner loses access.
+        $this->as($this->owner)->post('/app/website/settings/owner', ['tenant' => 'baska'])->assertSessionHasErrors('action');
+        $this->as($this->owner)->post('/app/website/settings/owner', ['tenant' => 'yok-boyle-tenant', 'confirm' => 1])->assertSessionHasErrors('action');
+        $marketer = $this->addMember($this->site, TenantRole::Marketer);
+        $this->as($marketer)->post('/app/website/settings/owner', ['tenant' => 'baska', 'confirm' => 1])->assertForbidden();
+        $this->as($this->owner)->post('/app/website/settings/owner', ['tenant' => 'baska', 'confirm' => 1])->assertSessionHasNoErrors();
+        $this->assertSame(['tenant' => 'baska'], $setting('owner'));
+        $this->as($this->owner)->get('/app/website/settings')->assertNotFound();
+        $this->as($otherOwner, $other)->get('/app/website/settings')->assertOk();
+        // Bootstrap (site:setup, twice) and the panel change are all audited.
+        $this->assertSame(['console', 'console', 'user'], $this->inTenant($this->site, fn () => DB::table('audit_logs')->where('action', 'site.settings_changed')
+            ->where('resource_id', 'owner')->orderBy('created_at')->pluck('actor_type')->all()));
+    }
+
+    public function test_media_disk_and_cache_time_are_db_settings_and_production_needs_persistent_storage(): void
+    {
+        $this->as($this->owner)->post('/app/website/settings/delivery', ['cache_seconds' => 120])->assertSessionHasNoErrors();
+        $this->get('/')->assertHeader('Cache-Control', 'max-age=120, public');
+        $this->as($this->owner)->post('/app/website/settings/delivery', ['cache_seconds' => 99999])->assertSessionHasErrors('action');
+        $this->as($this->owner)->post('/app/website/settings/media', ['disk' => 'nope'])->assertSessionHasErrors('action');
+        $this->as($this->owner)->post('/app/website/settings/media', ['disk' => 's3'])->assertSessionHasNoErrors();
+        $this->assertSame(['disk' => 's3'], json_decode((string) DB::table('site_settings')->where('key', 'media')->value('value'), true));
+        $this->as($this->owner)->post('/app/website/settings/media', ['disk' => 'local'])->assertSessionHasNoErrors();
+
+        // Production: a local disk is refused for settings and uploads.
+        $this->app->detectEnvironment(fn () => 'production');
+        try {
+            $this->expectException(SiteError::class);
+            app(SiteMedia::class)->upload(UploadedFile::fake()->image('a.png', 100, 100), 'alt', Actor::system());
+        } finally {
+            $this->app->detectEnvironment(fn () => 'testing');
+        }
     }
 }
