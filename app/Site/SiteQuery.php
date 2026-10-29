@@ -92,15 +92,57 @@ final class SiteQuery
     }
 
     /**
+     * Public references: published, active and with a recorded client-name
+     * approval; the logo only with a logo approval. Ordered as arranged in
+     * the panel.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function references(bool $featuredOnly = false): array
+    {
+        return $this->cached('refs:'.(int) $featuredOnly, function () use ($featuredOnly) {
+            $rows = DB::table('site_references')->where('status', ContentStatus::Published->value)->where('active', true)->where('client_name_publication_approved', true)
+                ->when($featuredOnly, fn ($q) => $q->where('homepage_featured', true))->orderBy('featured_order')->orderBy('name')->get();
+            $links = DB::table('site_reference_contents as l')->join('site_contents as c', 'c.id', '=', 'l.content_id')
+                ->whereIn('l.reference_id', $rows->pluck('id'))->where('c.status', ContentStatus::Published->value)
+                ->orderBy('l.position')->get(['l.reference_id', 'c.type', 'c.slug', 'c.title', 'c.excerpt'])->groupBy('reference_id');
+
+            return $rows->map(function ($r) use ($links) {
+                $linked = collect($links[$r->id] ?? []);
+                $map = fn ($c) => ['type' => (string) $c->type, 'title' => (string) $c->title, 'excerpt' => (string) $c->excerpt, 'url' => self::url((string) $c->type, (string) $c->slug)];
+                $projects = $linked->where('type', 'project')->map($map)->values()->all();
+
+                return ['id' => (string) $r->id, 'slug' => (string) $r->slug, 'name' => (string) $r->name, 'website_url' => $r->website_url, 'industry' => $r->industry,
+                    'short_description' => (string) $r->short_description, 'body' => (string) $r->body, 'capabilities' => (array) json_decode((string) $r->capabilities, true),
+                    'logo' => $r->logo_use_approved ? SiteMedia::describe($r->logo_media_id) : null,
+                    'logo_dark' => $r->logo_use_approved ? SiteMedia::describe($r->logo_dark_media_id) : null,
+                    'projects' => $projects, 'services' => $linked->whereIn('type', ['service', 'solution'])->map($map)->values()->all(),
+                    // A detail page only when there is more to say than the list shows.
+                    'has_detail' => trim((string) $r->body) !== '' || $projects !== [], 'url' => '/referanslar/'.$r->slug, 'updated_at' => $r->updated_at];
+            })->all();
+        });
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function reference(string $slug): ?array
+    {
+        return collect($this->references())->first(fn ($r) => $r['slug'] === $slug && $r['has_detail']);
+    }
+
+    /**
      * Every published URL with its last change (sitemap).
      *
      * @return list<array{loc: string, lastmod: ?string}>
      */
     public function sitemap(): array
     {
-        return $this->cached('sitemap', fn () => DB::table('site_contents')->where('status', ContentStatus::Published->value)
+        return $this->cached('sitemap', fn () => [...DB::table('site_contents')->where('status', ContentStatus::Published->value)
             ->orderBy('type')->orderBy('sort_order')->get(['type', 'slug', 'updated_at'])
-            ->map(fn ($r) => ['loc' => self::url($r->type, $r->slug), 'lastmod' => $r->updated_at === null ? null : substr((string) $r->updated_at, 0, 10)])->all());
+            ->map(fn ($r) => ['loc' => self::url($r->type, $r->slug), 'lastmod' => $r->updated_at === null ? null : substr((string) $r->updated_at, 0, 10)])->all(),
+            ...array_map(fn ($r) => ['loc' => $r['url'], 'lastmod' => $r['updated_at'] === null ? null : substr((string) $r['updated_at'], 0, 10)],
+                array_values(array_filter($this->references(), fn ($r) => $r['has_detail'])))]);
     }
 
     /**

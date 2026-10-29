@@ -17,6 +17,8 @@ foreach (['hizmetler' => 'service', 'cozumler' => 'solution', 'projeler' => 'pro
     Route::get($prefix, [PublicSiteController::class, 'index'])->defaults('type', $type)->name("site.{$type}.index");
     Route::get($prefix.'/{slug}', [PublicSiteController::class, 'show'])->defaults('type', $type)->where('slug', $slug)->name("site.{$type}.show");
 }
+Route::get('referanslar', [PublicSiteController::class, 'references'])->name('site.references');
+Route::get('referanslar/{slug}', [PublicSiteController::class, 'reference'])->where('slug', $slug)->name('site.reference');
 Route::get('hakkimizda', [PublicSiteController::class, 'page'])->defaults('slug', 'hakkimizda')->name('site.about');
 Route::get('iletisim', [PublicSiteController::class, 'page'])->defaults('slug', 'iletisim')->name('site.contact');
 Route::get('iletisim/tesekkurler', [PublicSiteController::class, 'thanks'])->name('site.thanks');

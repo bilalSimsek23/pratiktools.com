@@ -163,6 +163,7 @@
         <a href="{{ route('panel.website.content', 'solution') }}" @class(['active' => request()->is('app/website/solution')])>Çözümler</a>
         <a href="{{ route('panel.website.content', 'project') }}" @class(['active' => request()->is('app/website/project')])>Projeler</a>
         <a href="{{ route('panel.website.content', 'article') }}" @class(['active' => request()->is('app/website/article')])>Blog</a>
+        @if ($panelCan(\App\Tenancy\Permission::SiteReferencesView))<a href="{{ route('panel.website.references') }}" @class(['active' => str_starts_with($route, 'panel.website.references')])>Referanslar</a>@endif
         @if ($panelCan(\App\Tenancy\Permission::SiteLeads))<a href="{{ route('panel.website.leads') }}" @class(['active' => $route === 'panel.website.leads'])>Leadler</a>@endif
         <a href="{{ route('panel.website.seo') }}" @class(['active' => $route === 'panel.website.seo'])>SEO ve ölçüm</a>
         <a href="{{ route('panel.website.media') }}" @class(['active' => $route === 'panel.website.media'])>Görseller</a>

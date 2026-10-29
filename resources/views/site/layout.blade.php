@@ -27,6 +27,7 @@
             <a href="/hizmetler" @class(['active' => request()->is('hizmetler*')])>Hizmetler</a>
             <a href="/cozumler" @class(['active' => request()->is('cozumler*')])>Çözümler</a>
             <a href="/projeler" @class(['active' => request()->is('projeler*')])>Projeler</a>
+            <a href="/referanslar" @class(['active' => request()->is('referanslar*')])>Referanslar</a>
             <a href="/blog" @class(['active' => request()->is('blog*')])>Blog</a>
             <a href="/hakkimizda" @class(['active' => request()->is('hakkimizda')])>Hakkımızda</a>
         </nav>
@@ -51,7 +52,7 @@
         <div>
             <h2 class="footer-title">Site</h2>
             <ul class="footer-links">
-                <li><a href="/cozumler">Çözümler</a></li><li><a href="/projeler">Projeler</a></li><li><a href="/blog">Blog</a></li>
+                <li><a href="/cozumler">Çözümler</a></li><li><a href="/projeler">Projeler</a></li><li><a href="/referanslar">Referanslar</a></li><li><a href="/blog">Blog</a></li>
                 <li><a href="/hakkimizda">Hakkımızda</a></li><li><a href="/iletisim">İletişim</a></li>
                 @if ($org['kvkk_url'])<li><a href="{{ $org['kvkk_url'] }}">KVKK Aydınlatma Metni</a></li>@endif
             </ul>

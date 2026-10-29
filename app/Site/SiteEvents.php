@@ -17,7 +17,7 @@ final class SiteEvents
     {
         $path = '/'.trim(strtolower((string) parse_url($path, PHP_URL_PATH)), '/');
 
-        return preg_match('#^/((hizmetler|cozumler|projeler|blog)(/[a-z0-9]+(-[a-z0-9]+)*)?|hakkimizda|iletisim)?$#', $path) === 1 ? $path : null;
+        return preg_match('#^/((hizmetler|cozumler|projeler|referanslar|blog)(/[a-z0-9]+(-[a-z0-9]+)*)?|hakkimizda|iletisim)?$#', $path) === 1 ? $path : null;
     }
 
     public function record(string $event, string $path): bool

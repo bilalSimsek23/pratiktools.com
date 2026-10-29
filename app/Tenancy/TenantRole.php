@@ -40,6 +40,9 @@ enum TenantRole: string
                 Permission::SiteView,
                 Permission::SiteEdit,
                 Permission::SiteLeads,
+                Permission::SiteReferencesView,
+                Permission::SiteReferencesEdit,
+                Permission::SiteReferencesManageLogo,
             ],
             self::Viewer => [
                 Permission::TenantView,
@@ -54,6 +57,8 @@ enum TenantRole: string
                 Permission::LeadsView,
                 Permission::SiteView,
                 Permission::SitePublish,
+                Permission::SiteReferencesView,
+                Permission::SiteReferencesPublish,
             ],
         };
     }

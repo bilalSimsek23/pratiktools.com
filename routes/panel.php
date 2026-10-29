@@ -8,6 +8,7 @@ use App\Http\Controllers\Panel\DispatchController;
 use App\Http\Controllers\Panel\LeadFormController;
 use App\Http\Controllers\Panel\OperationsController;
 use App\Http\Controllers\Panel\ReconciliationController;
+use App\Http\Controllers\Panel\ReferenceController;
 use App\Http\Controllers\Panel\SegmentAutomationController;
 use App\Http\Controllers\Panel\WebsiteController;
 use App\Http\Middleware\EnsureSiteOwner;
@@ -93,6 +94,15 @@ Route::middleware('auth:web')->group(function () {
         Route::get('settings', [OperationsController::class, 'settings'])->name('settings');
         Route::middleware(EnsureSiteOwner::class)->prefix('website')->name('website.')->group(function () {
             Route::get('seo', [WebsiteController::class, 'seo'])->name('seo');
+            Route::get('references', [ReferenceController::class, 'index'])->name('references');
+            Route::post('references', [ReferenceController::class, 'store'])->name('references.store');
+            Route::post('references/arrange', [ReferenceController::class, 'arrange'])->name('references.arrange');
+            Route::get('references/{reference}', [ReferenceController::class, 'edit'])->whereUuid('reference')->name('references.edit');
+            Route::post('references/{reference}', [ReferenceController::class, 'update'])->whereUuid('reference')->name('references.update');
+            Route::post('references/{reference}/status', [ReferenceController::class, 'status'])->whereUuid('reference')->middleware(PanelRecentAuth::class)->name('references.status');
+            Route::post('references/{reference}/delete', [ReferenceController::class, 'destroy'])->whereUuid('reference')->middleware(PanelRecentAuth::class)->name('references.delete');
+            Route::post('references/{reference}/approval', [ReferenceController::class, 'approval'])->whereUuid('reference')->middleware(PanelRecentAuth::class)->name('references.approval');
+            Route::post('references/{reference}/logo', [ReferenceController::class, 'logo'])->whereUuid('reference')->middleware('throttle:20,1')->name('references.logo');
             Route::get('leads', [WebsiteController::class, 'leads'])->name('leads');
             Route::post('leads/{inquiry}', [WebsiteController::class, 'leadStatus'])->whereUuid('inquiry')->name('leads.status');
             Route::get('media', [WebsiteController::class, 'media'])->name('media');

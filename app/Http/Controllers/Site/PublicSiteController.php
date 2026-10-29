@@ -39,6 +39,7 @@ final class PublicSiteController extends Controller
                 $this->site->categories('service')),
             'solutions' => $this->site->published(ContentType::Solution, limit: 6),
             'projects' => $this->site->published(ContentType::Project, limit: 6, featuredOnly: true),
+            'references' => $this->site->references(featuredOnly: true),
             'articles' => $this->site->published(ContentType::Article, limit: 3),
         ], $this->seo->meta($page['seo_title'] ?? 'PratikTools', $page['seo_description'] ?? $page['excerpt'], '/'), [$this->seo->organization(), $this->seo->website()], 'page_view');
     }
@@ -94,6 +95,25 @@ final class PublicSiteController extends Controller
 
         return $this->render($slug === 'iletisim' ? 'site.contact' : 'site.page', ['item' => $item, 'html' => SiteMarkdown::render((string) ($item['body'] ?? '')), 'crumbs' => $crumbs],
             $this->seo->meta(($item['seo_title'] ?? null) ?: $item['title'], ($item['seo_description'] ?? null) ?: $item['excerpt'], $item['url']),
+            [$this->seo->organization(), $this->seo->breadcrumbs($crumbs)], 'page_view');
+    }
+
+    public function references(): Response
+    {
+        $crumbs = [['Ana Sayfa', '/'], ['Referanslar', '/referanslar']];
+        $intro = 'Birlikte çalıştığımız kurumlar ve onlar için geliştirdiğimiz sistemler.';
+
+        return $this->render('site.references', ['references' => $this->site->references(), 'crumbs' => $crumbs, 'intro' => $intro],
+            $this->seo->meta('Referanslar', $intro, '/referanslar'), [$this->seo->organization(), $this->seo->breadcrumbs($crumbs)], 'page_view');
+    }
+
+    public function reference(string $slug): Response
+    {
+        $ref = $this->site->reference($slug) ?? abort(404);
+        $crumbs = [['Ana Sayfa', '/'], ['Referanslar', '/referanslar'], [$ref['name'], $ref['url']]];
+
+        return $this->render('site.reference', ['ref' => $ref, 'html' => SiteMarkdown::render($ref['body']), 'crumbs' => $crumbs],
+            $this->seo->meta($ref['name'].' — '.$ref['short_description'], $ref['short_description'].'. '.SiteMarkdown::plain($ref['body'], 120), $ref['url'], image: $ref['logo']),
             [$this->seo->organization(), $this->seo->breadcrumbs($crumbs)], 'page_view');
     }
 

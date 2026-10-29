@@ -56,4 +56,11 @@ enum Permission: string
     case SitePublish = 'site.publish';
     case SiteLeads = 'site.leads';
     case SiteSettings = 'site.settings';
+    // Website references: view, edit texts/relations/order, publish/archive,
+    // record client-name and logo approvals, upload/replace logos.
+    case SiteReferencesView = 'site.references.view';
+    case SiteReferencesEdit = 'site.references.edit';
+    case SiteReferencesPublish = 'site.references.publish';
+    case SiteReferencesApproveClient = 'site.references.approve_client';
+    case SiteReferencesManageLogo = 'site.references.manage_logo';
 }

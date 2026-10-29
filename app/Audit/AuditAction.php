@@ -85,6 +85,15 @@ enum AuditAction: string
     case SiteSettingsChanged = 'site.settings_changed';
     case SiteMediaUploaded = 'site.media_uploaded';
     case SiteInquiryChanged = 'site.inquiry_changed';
+    case SiteReferenceCreated = 'site.reference_created';
+    case SiteReferenceChanged = 'site.reference_changed';
+    case SiteReferencePublished = 'site.reference_published';
+    case SiteReferenceArchived = 'site.reference_archived';
+    case SiteReferenceDeleted = 'site.reference_deleted';
+    case SiteReferenceFeaturedChanged = 'site.reference_featured_changed';
+    case SiteReferenceNameApproval = 'site.reference_name_approval';
+    case SiteReferenceLogoApproval = 'site.reference_logo_approval';
+    case SiteReferenceLogoChanged = 'site.reference_logo_changed';
     case ViaConfigured = 'consent.via_configured';
     case ViaFormStatusChanged = 'consent.via_form_status_changed';
     case ViaConsentCompleted = 'consent.via_completed';

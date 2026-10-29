@@ -41,7 +41,14 @@
 </section>
 @endif
 
-@if ($projects !== [])
+@if ($references !== [])
+<section class="section wrap" aria-labelledby="markalar">
+    <div class="section-head"><h2 id="markalar">Birlikte çalıştığımız markalar</h2><a href="/referanslar">Tüm referanslar →</a></div>
+    <ul class="ref-strip">@foreach ($references as $ref)<li>@if ($ref['has_detail'])<a href="{{ $ref['url'] }}">@include('site.partials.ref-logo', ['ref' => $ref])</a>@else @include('site.partials.ref-logo', ['ref' => $ref])@endif</li>@endforeach</ul>
+    <h3 class="sub-head">Seçili çalışmalar</h3>
+    <div class="cards">@foreach (array_slice($references, 0, 6) as $ref)@include('site.partials.ref-card', ['ref' => $ref])@endforeach</div>
+</section>
+@elseif ($projects !== [])
 <section class="section wrap" aria-labelledby="projeler">
     <div class="section-head"><h2 id="projeler">Seçili projeler</h2><a href="/projeler">Tüm projeler →</a></div>
     <div class="cards">@foreach ($projects as $c)@include('site.partials.card', ['c' => $c])@endforeach</div>

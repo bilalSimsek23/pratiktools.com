@@ -35,7 +35,7 @@ final class SiteFilesController extends Controller
     public function sitemap(SiteQuery $site): Response
     {
         $base = rtrim((string) config('app.url'), '/');
-        $urls = [['loc' => '/', 'lastmod' => null], ...array_map(fn ($p) => ['loc' => $p, 'lastmod' => null], ['/hizmetler', '/cozumler', '/projeler', '/blog']),
+        $urls = [['loc' => '/', 'lastmod' => null], ...array_map(fn ($p) => ['loc' => $p, 'lastmod' => null], ['/hizmetler', '/cozumler', '/projeler', '/referanslar', '/blog']),
             ...array_values(array_filter($site->sitemap(), fn ($u) => $u['loc'] !== '/'))];
         $seen = [];
         $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n".'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
