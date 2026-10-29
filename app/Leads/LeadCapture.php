@@ -71,7 +71,7 @@ final class LeadCapture
      * Call inside the form's tenant context.
      *
      * @param  array<string, mixed>  $input
-     * @return array{outcome: string, message: string}
+     * @return array{outcome: string, message: string, submission_id?: ?string, recipient_id?: ?string}
      */
     public function submit(string $publicId, array $input, ?string $origin, ?string $ip = null): array
     {
@@ -112,19 +112,21 @@ final class LeadCapture
             return ['outcome' => 'duplicate'] + $generic;
         }
 
-        $outcome = DB::transaction(fn () => $this->record($form, $normalized, $consent, $key, $input));
+        [$outcome, $submissionId, $recipientId] = DB::transaction(fn () => $this->record($form, $normalized, $consent, $key, $input));
         $this->metrics->add($form->id, $outcome === 'duplicate' ? ['duplicate' => 1] : array_filter([
             'accepted' => 1, 'consent_checked' => $consent ? 1 : 0, 'consent_unchecked' => $consent ? 0 : 1,
         ]));
 
-        return ['outcome' => $outcome] + $generic;
+        // Internal ids for callers inside the app (never in an HTTP answer).
+        return ['outcome' => $outcome, 'submission_id' => $submissionId, 'recipient_id' => $recipientId] + $generic;
     }
 
     /**
      * @param  array{address: string, valid: bool, reason: ?string, marketplace: bool}  $normalized
      * @param  array<string, mixed>  $input
+     * @return array{0: string, 1: ?string, 2: ?string} outcome, submission id, recipient id
      */
-    private function record(object $form, array $normalized, bool $consent, string $key, array $input): string
+    private function record(object $form, array $normalized, bool $consent, string $key, array $input): array
     {
         $tenantId = $this->context->requireTenant();
         $address = $normalized['address'];
@@ -160,7 +162,7 @@ final class LeadCapture
                 $optIn ? 'pending' : 'none', $token === null ? null : hash('sha256', $token), $optIn ? $now->addHours((int) config('leads.double_opt_in_hours')) : null],
         );
         if ($id === null) {
-            return 'duplicate';
+            return ['duplicate', null, null];
         }
         if ($isNew) {
             $this->metrics->add($form->id, ['new_recipients' => 1]);
@@ -176,7 +178,7 @@ final class LeadCapture
             if (($form->consent_mode ?? 'local_only') === 'via') {
                 $this->via->open($recipientId, $customerId, $form->id, (string) $id->id);
 
-                return $outcome;
+                return [$outcome, (string) $id->id, $recipientId];
             }
             DB::table('consent_write_intents')->insert(['id' => (string) Str::uuid7(), 'tenant_id' => $tenantId, 'recipient_id' => $recipientId, 'target' => 'IYS',
                 'channel' => 'EMAIL', 'status' => 'ONAY', 'source' => 'LEAD_FORM', 'state' => 'pending_write_disabled', 'created_at' => $now, 'updated_at' => $now]);
@@ -187,7 +189,7 @@ final class LeadCapture
             }
         }
 
-        return $outcome;
+        return [$outcome, (string) $id->id, $recipientId];
     }
 
     /**

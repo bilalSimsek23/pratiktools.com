@@ -132,5 +132,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Coarse outer limit for public lead forms (per-form limits are in the controller).
         RateLimiter::for('lead-capture', fn (Request $request) => Limit::perMinute(120)->by('lead:'.$request->ip()));
+
+        // Public website: inquiries (finer limits in SiteInquiries) and the event beacon.
+        RateLimiter::for('site-inquiry', fn (Request $request) => Limit::perMinute(20)->by('site-inquiry:'.$request->ip()));
+        RateLimiter::for('site-events', fn (Request $request) => Limit::perMinute(120)->by('site-events:'.$request->ip()));
     }
 }

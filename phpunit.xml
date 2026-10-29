@@ -20,6 +20,7 @@
         </include>
     </source>
     <php>
+        <ini name="memory_limit" value="512M"/>
         <!-- Tests run against real PostgreSQL (RLS) and Redis. CI overrides
              host/port through the environment; these are local defaults. -->
         <env name="APP_ENV" value="testing"/>

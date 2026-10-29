@@ -76,6 +76,15 @@ enum AuditAction: string
     case LeadFormConsentChanged = 'lead_form.consent_text_changed';
     case LeadFormConsentModeChanged = 'lead_form.consent_mode_changed';
     case ConsentStrategyChanged = 'consent.strategy_changed';
+    case SiteContentCreated = 'site.content_created';
+    case SiteContentChanged = 'site.content_changed';
+    case SiteContentPublished = 'site.content_published';
+    case SiteContentArchived = 'site.content_archived';
+    case SiteClientApproved = 'site.client_approved';
+    case SiteCategoryChanged = 'site.category_changed';
+    case SiteSettingsChanged = 'site.settings_changed';
+    case SiteMediaUploaded = 'site.media_uploaded';
+    case SiteInquiryChanged = 'site.inquiry_changed';
     case ViaConfigured = 'consent.via_configured';
     case ViaFormStatusChanged = 'consent.via_form_status_changed';
     case ViaConsentCompleted = 'consent.via_completed';

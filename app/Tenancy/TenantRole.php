@@ -37,6 +37,9 @@ enum TenantRole: string
                 Permission::CampaignsManage,
                 Permission::ContentManage,
                 Permission::LeadsView,
+                Permission::SiteView,
+                Permission::SiteEdit,
+                Permission::SiteLeads,
             ],
             self::Viewer => [
                 Permission::TenantView,
@@ -49,6 +52,8 @@ enum TenantRole: string
                 Permission::AutomationsView,
                 Permission::IntegrationsView,
                 Permission::LeadsView,
+                Permission::SiteView,
+                Permission::SitePublish,
             ],
         };
     }

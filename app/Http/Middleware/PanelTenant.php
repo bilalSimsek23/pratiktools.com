@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Tenant;
 use App\Models\TenantUser;
+use App\Site\SiteOwner;
 use App\Tenancy\Permission;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
@@ -55,6 +56,8 @@ final class PanelTenant
                 'panelTenantName' => Tenant::query()->whereKey($tenantId)->value('name'),
                 'panelRole' => self::ROLE_LABELS[$membership->role->value],
                 'panelCan' => fn (Permission $p): bool => $membership->role->allows($p),
+                // Website menu only in the site-owner tenant.
+                'panelSiteOwner' => app(SiteOwner::class)->is($tenantId),
                 'pendingApprovals' => $membership->role->allows(Permission::CampaignsApprove)
                     ? DB::table('campaign_approvals')->where('tenant_id', $tenantId)->where('status', 'pending')->where('requested_by', '<>', $user->getAuthIdentifier())->count() : 0,
             ]);

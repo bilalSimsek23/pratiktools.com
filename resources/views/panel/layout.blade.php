@@ -156,6 +156,18 @@
         <a href="{{ route('panel.integrations') }}" @class(['active' => $route === 'panel.integrations'])>Entegrasyonlar</a>
         @endif
         <a href="{{ route('panel.settings') }}" @class(['active' => $route === 'panel.settings'])>Ayarlar</a>
+        @if (($panelSiteOwner ?? false) && isset($panelCan) && $panelCan(\App\Tenancy\Permission::SiteView))
+        <div class="group">Web Sitesi</div>
+        <a href="{{ route('panel.website.content', 'page') }}" @class(['active' => request()->is('app/website/page')])>Ana Sayfa ve Sayfalar</a>
+        <a href="{{ route('panel.website.content', 'service') }}" @class(['active' => request()->is('app/website/service')])>Hizmetler</a>
+        <a href="{{ route('panel.website.content', 'solution') }}" @class(['active' => request()->is('app/website/solution')])>Çözümler</a>
+        <a href="{{ route('panel.website.content', 'project') }}" @class(['active' => request()->is('app/website/project')])>Projeler</a>
+        <a href="{{ route('panel.website.content', 'article') }}" @class(['active' => request()->is('app/website/article')])>Blog</a>
+        @if ($panelCan(\App\Tenancy\Permission::SiteLeads))<a href="{{ route('panel.website.leads') }}" @class(['active' => $route === 'panel.website.leads'])>Leadler</a>@endif
+        <a href="{{ route('panel.website.seo') }}" @class(['active' => $route === 'panel.website.seo'])>SEO ve ölçüm</a>
+        <a href="{{ route('panel.website.media') }}" @class(['active' => $route === 'panel.website.media'])>Görseller</a>
+        <a href="{{ route('panel.website.settings') }}" @class(['active' => $route === 'panel.website.settings'])>Formlar ve Site Ayarları</a>
+        @endif
     </nav>
     <div>
         <header class="topbar">

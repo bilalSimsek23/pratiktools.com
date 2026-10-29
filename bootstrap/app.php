@@ -31,10 +31,9 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->name('panel.')
                 ->group(base_path('routes/panel.php'));
 
-            // Product root: the panel (login when signed out, dashboard when signed in).
-            Route::middleware(['web', RejectAdminHost::class])
-                ->get('/', fn () => redirect()->route('panel.dashboard'))
-                ->name('home');
+            // Public company website at the root (stateless; no session, no
+            // tenant). The SaaS panel stays under /app.
+            Route::middleware([RejectAdminHost::class])->group(base_path('routes/site.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {

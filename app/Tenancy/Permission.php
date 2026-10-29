@@ -49,4 +49,11 @@ enum Permission: string
     case SuppressionsView = 'suppressions.view';
     // Upload, analyse and apply İYS change reports (owner, admin).
     case ConsentReconcile = 'consent.reconcile';
+    // Public website (only in the site-owner tenant): view, edit drafts,
+    // publish/archive, read website inquiries, change site settings.
+    case SiteView = 'site.view';
+    case SiteEdit = 'site.edit';
+    case SitePublish = 'site.publish';
+    case SiteLeads = 'site.leads';
+    case SiteSettings = 'site.settings';
 }
