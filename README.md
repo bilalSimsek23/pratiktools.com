@@ -127,6 +127,17 @@ are never lifted by it. Reports are uploaded under İYS › Mutabakat: dry-run, 
 "not configured" and eligibility stays fail-closed. See
 [docs/production/consent-via-reconciliation.md](docs/production/consent-via-reconciliation.md).
 
+## Public website and CMS (F7.5)
+
+`/` is the PratikTools company website (services, solutions/landing pages, projects, blog,
+about, contact), server-rendered without session or cookies; the SaaS panel stays under `/app`.
+Content lives in platform-level `site_*` tables (no tenant data) and is managed in
+`/app › Web Sitesi` by the site-owner tenant (`SITE_OWNER_TENANT`) with separate edit/publish
+permissions. Inquiries reuse F6 lead capture in that tenant. Includes SEO meta, canonical,
+Open Graph, sitemap, schema.org JSON-LD, a managed robots.txt (OAI-SearchBot allowed, GPTBot a
+setting) and consent-gated analytics by validated provider ids. See
+[docs/production/public-website.md](docs/production/public-website.md).
+
 ## Production (Laravel Cloud)
 
 See [docs/production/laravel-cloud.md](docs/production/laravel-cloud.md): boot safety rules, the

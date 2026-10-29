@@ -1,0 +1,143 @@
+# Public website and CMS (F7.5)
+
+`https://pratiktools.com/` is the PratikTools company website. The SaaS panel is
+unchanged under `/app`; the API under `/api`.
+
+## Architecture
+
+| Part | Where | Notes |
+|---|---|---|
+| Public pages | `routes/site.php`, `App\Http\Controllers\Site` | No session, no cookie, no tenant context; `Cache-Control: public, max-age=300` |
+| Content | `site_categories`, `site_contents`, `site_content_relations`, `site_media`, `site_settings`, `site_events_daily` | Platform-level marketing content, **no tenant_id, no personal data** |
+| Management | `/app/website/*` (`WebsiteController`) | Only when the panel tenant is `SITE_OWNER_TENANT` (`EnsureSiteOwner`, else 404) |
+| Inquiries | `POST /iletisim/talep` → F6 `LeadCapture` + `lead_inquiries` | Tenant data of the owner tenant (FORCE RLS, PII list) |
+
+A public visitor never gets a tenant context, so every tenant table stays
+invisible (FORCE RLS returns nothing). Website code never reads tenant tables
+except the inquiry write inside the owner tenant's context.
+
+## Routes
+
+`/`, `/hizmetler`, `/hizmetler/{slug}`, `/cozumler`, `/cozumler/{slug}`,
+`/projeler`, `/projeler/{slug}`, `/blog`, `/blog/{slug}` (`?kategori=` filter,
+noindex), `/hakkimizda`, `/iletisim`, `/iletisim/tesekkurler` (noindex),
+`/sitemap.xml`, `/robots.txt`, `/media/{id}/{width}.{webp|jpg}`, `POST /t`
+(event beacon), `POST /iletisim/talep`.
+
+## Content model
+
+Types: `service`, `solution` (ad landing page), `project` (case study),
+`article`, `page` (`home`, `hakkimizda`, `iletisim`). Status `draft →
+published → archived`; only published content is public, in the sitemap and
+indexable. Slugs are unique per type and fixed once published.
+
+Fields: title, slug, excerpt, Markdown body, SEO title/description, social
+image, category, featured, order, related content, plus type fields
+(`ContentType::fields()`): hero, problem, technical approach, benefits,
+features, integrated systems, use cases, FAQ, CTA (services/solutions;
+solutions add examples and form type); client display name, real client name,
+industry, problem, solution, technologies, integrations, measurable outcome
+(projects); author (articles); home sections (pages).
+
+Projects are anonymous by default. The real client name appears only when
+"Müşteri adı yayınlansın" is set **and** a client approval (how it was
+obtained) is recorded by a publisher; changing the name drops the approval and
+publishing refuses without it.
+
+## Permissions (only in the owner tenant)
+
+| | owner | admin | marketer | approver | viewer |
+|---|---|---|---|---|---|
+| site.view | x | x | x | x | |
+| site.edit (drafts, categories, images) | x | x | x | | |
+| site.publish (publish/archive, client approval) | x | x | | x | |
+| site.leads (inquiries, personal data) | x | x | x | | |
+| site.settings (organization, analytics, crawlers) | x | x | | | |
+
+Publishing, status changes, client approval and settings need a recent
+password confirmation; every change is audited.
+
+## Security
+
+- Bodies are Markdown rendered with raw HTML stripped; `javascript:`/`data:`
+  links removed; images only from `/media/`; outbound links `noopener nofollow`.
+  Every other field is plain text, escaped on output. No Blade/PHP/script in content.
+- JSON-LD is encoded with `<`, `>`, `&`, quotes escaped.
+- Uploads: JPEG/PNG/WebP detected from the bytes (no SVG/GIF), ≤ 5 MB, pixel
+  limit, decoded and re-encoded with GD (metadata and appended payloads
+  dropped), served from our origin with `immutable` caching.
+- Analytics: only validated ids (GA4 `G-…`, Google Ads `AW-…` + label, Meta
+  Pixel digits). `site.js` loads providers after the visitor accepts the
+  consent banner; the CSP is widened per page only for those providers' hosts.
+  No pasted scripts anywhere.
+- Public pages send `Referrer-Policy: strict-origin-when-cross-origin` (so form
+  posts carry an Origin); everything else keeps `no-referrer`.
+- `/app`, `/api`, admin host and technical endpoints send `X-Robots-Tag: noindex, nofollow`.
+
+## Inquiry form
+
+Fields: name, e-mail, phone (optional), company (optional), interest
+(published services/solutions), message, optional marketing opt-in, form type
+(Teklif Al / Görüşme Talep Et / Projenizi Anlatın / Demo Talep Et).
+
+Protection: same-origin (Origin; Referer only if no Origin; `null` refused),
+16 KB payload limit, 5/min and 20/h per IP (plus a route throttle), honeypot,
+signed render timestamp (≥ 3 s, ≤ 24 h), the F6 bot verifier, field limits.
+Accepted, duplicate and bot submissions get the same answer (no enumeration).
+
+Storage: F6 lead capture in the owner tenant (lead customer, consent
+recipient, metrics, idempotency by a per-page-load submission id; marketing
+consent only if ticked — never İYS ONAY) plus `lead_inquiries` with the
+message and attribution.
+
+Attribution (first touch kept 90 days in the browser, last touch per visit):
+utm source/medium/campaign/content/term, landing path (no query string),
+referrer host, presence of gclid/fbclid/msclkid (never the value), and a class:
+`google_ads`, `meta_ads`, `ai_search`, `campaign`, `organic`, `referral`, `direct`.
+
+## SEO and AI crawlers
+
+Per page: unique title, meta description, canonical (no query), robots,
+Open Graph, Twitter card, visible breadcrumbs, internal links (categories,
+related and referencing content, footer).
+
+JSON-LD: Organization + WebSite (home), Service (services/solutions),
+BlogPosting (articles), BreadcrumbList, FAQPage only when the FAQ is shown.
+
+`robots.txt` (dynamic; the static file was removed):
+
+- `User-agent: *` and `User-agent: OAI-SearchBot`: allow `/`, disallow `/app`,
+  `/api`, `/u/`, `/health`, `/webhooks`, `/public/v1`, form/beacon endpoints.
+- `User-agent: GPTBot` (model training): **disallowed by default**; Site
+  Ayarları can allow it. It is a separate decision from search visibility.
+- `Sitemap:` line.
+
+Everything important is in the server-rendered HTML; no auth or CAPTCHA for
+crawlers.
+
+## Measurement
+
+First-party counters without cookies or personal data (`site_events_daily`):
+page_view, service/solution/project/article_view, lead_form_open, lead_submit
+(server side), contact_click. The same events go to GA4 / Google Ads (lead
+conversion label) / Meta Pixel when configured and consented. Meta Conversions
+API needs a secret (vault) and is not implemented yet.
+
+## Operator setup
+
+1. Create the PratikTools tenant and its panel users (`tenant:member`).
+2. `SITE_OWNER_TENANT=<slug>` (Laravel Cloud environment).
+3. `php artisan site:setup --tenant=<slug>` — creates the website lead form
+   (origin = APP_URL) in that tenant.
+4. Attach an object storage bucket and set `SITE_MEDIA_DISK` before uploading
+   images (local disk does not survive deploys).
+5. Review and edit the starting content; fill in the case-study drafts; add
+   contact details, KVKK page URL and analytics ids in Site Ayarları.
+
+## Starting content
+
+Installed once by a migration (`InitialContent`, only missing slugs):
+15 service categories, 9 article categories, published pages (home, about,
+contact), 9 service pages and 4 ad landing pages, and 10 case-study **drafts**
+without client data. The text describes capabilities and approach only — no
+clients, references, success rates or revenue claims.
