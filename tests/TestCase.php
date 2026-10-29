@@ -3,6 +3,7 @@
 namespace Tests;
 
 use App\Site\InitialContent;
+use App\Site\InitialReferences;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
@@ -30,8 +31,9 @@ abstract class TestCase extends BaseTestCase
         );
         // Website tables are not tenant data (no tenant FK): reset them to the
         // installed starting content.
-        DB::connection('pgsql_owner')->statement('TRUNCATE site_content_relations, site_contents, site_categories, site_media, site_settings, site_events_daily CASCADE');
+        DB::connection('pgsql_owner')->statement('TRUNCATE site_reference_contents, site_references, site_content_relations, site_contents, site_categories, site_media, site_settings, site_events_daily CASCADE');
         InitialContent::install();
+        InitialReferences::install();
 
         $this->app->make(TenantContext::class)->clear();
     }
