@@ -67,11 +67,11 @@ occurred/observed time, provider transaction id and, for reports,
 `App\Consent\Via\ViaConsentProvider` (status, frame, event verification),
 `ViaConsentEvent` (DTO), `ViaConsentHandler` (completion), `ViaConsentRequests`.
 
-The bound implementation is `UnconfiguredViaProvider`: it shows a stored frame
-(integration `iys_via` / `consent_acquisition`, setting `frame_id`) but never
-reports ViA as usable and refuses every event (`VIA_EVENT_FORMAT_UNVERIFIED`).
-There is **no inbound ViA endpoint**: no official event format, signature
-scheme or sample exists yet.
+The bound implementation is `IysViaProvider`, driven by the tenant's stored
+ViA form (OTP, ETK, Form ID, form status). It is usable only for an approved
+form with a configured OTP transport; the transport is `NOT_CONFIGURED`.
+Inbound events are refused (`VIA_EVENT_FORMAT_UNVERIFIED`). See
+[../integrations/iys-via.md](../integrations/iys-via.md).
 
 Handler rules (tested with a test-only provider):
 
