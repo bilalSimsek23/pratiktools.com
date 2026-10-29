@@ -20,7 +20,9 @@ return [
     // Image disk (fallback; setting "media"). Production accepts only a
     // persistent (object storage) disk; its credentials stay in the
     // environment as secrets.
-    'media_disk' => env('SITE_MEDIA_DISK', 'local'),
+    // Unset: Laravel Cloud's attached "site-media" disk when present, else local.
+    'media_disk' => env('SITE_MEDIA_DISK'),
+    'cloud_media_disk' => 'site-media',
 
     // Hard security limits (code, not settings).
     'media_max_bytes' => 5 * 1024 * 1024,

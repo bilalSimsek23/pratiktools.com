@@ -13,7 +13,11 @@ return [
     |
     */
 
-    'default' => env('FILESYSTEM_DISK', 'local'),
+    // Not FILESYSTEM_DISK: Laravel Cloud sets that to an attached bucket marked
+    // "default", which would silently move every implicit Storage call to
+    // object storage. The app's default stays local; website media name
+    // their disk explicitly (Web Sitesi › Site Ayarları, "site-media").
+    'default' => env('APP_FILESYSTEM_DISK', 'local'),
 
     /*
     |--------------------------------------------------------------------------

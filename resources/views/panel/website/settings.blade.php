@@ -59,6 +59,12 @@
         @if (! \App\Site\SiteSettings::persistentDisk($mediaDisk))<p class="small"><span class="badge b-warn">Kalıcı değil</span> Production'da görsel yükleme bu diskle kapalıdır.</p>@endif
         @if ($canSettings)<div class="actions"><button class="btn" type="submit">Kaydet</button></div>@endif
     </form>
+    @if ($canSettings)
+    <form method="post" action="{{ route('panel.website.storage-check') }}" class="actions">@csrf
+        <button class="btn" type="submit">Depolamayı test et</button>
+        <span class="hint">Seçili diske benzersiz bir test dosyası yazar, okur, doğrular ve siler. Erişim bilgisi gösterilmez.</span>
+    </form>
+    @endif
     <form method="post" action="{{ route('panel.website.settings.save', 'delivery') }}" class="form-grid stack-top">@csrf
         <label>Sayfa önbellek süresi (saniye, 0–3600) <input type="number" name="cache_seconds" min="0" max="3600" value="{{ $cacheSeconds }}" @disabled(! $canSettings)></label>
         @if ($canSettings)<div class="actions"><button class="btn" type="submit">Kaydet</button></div>@endif

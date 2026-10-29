@@ -50,15 +50,30 @@ final class SiteFilesController extends Controller
         return response($xml.'</urlset>'."\n", 200, ['Content-Type' => 'application/xml; charset=utf-8', 'Cache-Control' => 'public, max-age=3600']);
     }
 
+    /**
+     * Website images from a private bucket: read by the app with the disk's
+     * own credentials and streamed; the bucket is never public. URLs are
+     * content-addressed (a replaced image has a new id), so they are cached
+     * as immutable. Storage problems answer 503 without details.
+     */
     public function media(string $id, string $width, string $ext): BaseResponse
     {
         $row = DB::table('site_media')->where('id', $id)->first(['disk', 'variants']) ?? abort(404);
         $path = ((array) json_decode((string) $row->variants, true))[$ext][$width] ?? abort(404);
-        $disk = Storage::disk((string) $row->disk);
-        abort_unless($disk->exists($path), 404);
+        try {
+            $stream = Storage::disk((string) $row->disk)->readStream($path);
+        } catch (\Throwable $e) {
+            report($e);
+            $stream = false;
+        }
+        if (! is_resource($stream)) {
+            return response('', 503, ['Cache-Control' => 'no-store', 'Retry-After' => '60']);
+        }
 
-        return response((string) $disk->get($path), 200, ['Content-Type' => $ext === 'webp' ? 'image/webp' : 'image/jpeg',
-            'Cache-Control' => 'public, max-age=31536000, immutable', 'Content-Disposition' => 'inline']);
+        return response()->stream(function () use ($stream) {
+            fpassthru($stream);
+            fclose($stream);
+        }, 200, ['Content-Type' => $ext === 'webp' ? 'image/webp' : 'image/jpeg', 'Cache-Control' => 'public, max-age=31536000, immutable', 'Content-Disposition' => 'inline']);
     }
 
     public function event(Request $request, SiteEvents $events): Response

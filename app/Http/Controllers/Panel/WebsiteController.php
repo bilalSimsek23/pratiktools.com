@@ -16,6 +16,7 @@ use App\Site\SiteMedia;
 use App\Site\SiteQuery;
 use App\Site\SiteSeo;
 use App\Site\SiteSettings;
+use App\Site\SiteStorageCheck;
 use App\Tenancy\Permission;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
@@ -156,7 +157,11 @@ final class WebsiteController extends Controller
     {
         $this->authorizePanel(Permission::SiteView);
 
-        return view('panel.website.media', ['media' => DB::table('site_media')->orderByDesc('created_at')->limit(200)->get(), 'canEdit' => $this->can(Permission::SiteEdit),
+        return view('panel.website.media', ['media' => DB::table('site_media')->orderByDesc('created_at')->limit(200)->get()->map(function ($m) {
+            $m->usage = SiteMedia::usage((string) $m->id);
+
+            return $m;
+        }), 'canEdit' => $this->can(Permission::SiteEdit), 'disk' => app(SiteSettings::class)->mediaDisk(),
             'ephemeral' => ! SiteSettings::persistentDisk(app(SiteSettings::class)->mediaDisk()), 'production' => app()->isProduction()]);
     }
 
@@ -171,6 +176,22 @@ final class WebsiteController extends Controller
         }
 
         return $this->done('Görsel yüklendi.');
+    }
+
+    public function deleteMedia(string $media, SiteMedia $library): RedirectResponse
+    {
+        $this->authorizePanel(Permission::SiteEdit);
+
+        return $library->delete($media, $this->actor()) ? $this->done('Görsel silindi.') : $this->failed('Görsel kullanımda veya bulunamadı; önce kullanıldığı yerden kaldırın.');
+    }
+
+    public function storageCheck(SiteStorageCheck $check): RedirectResponse
+    {
+        $this->authorizePanel(Permission::SiteSettings);
+        $r = $check->run($this->actor());
+
+        return $r['passed'] ? $this->done("Depolama testi başarılı ({$r['disk']}): yazma, okuma, doğrulama ve silme çalışıyor.")
+            : $this->failed("Depolama testi başarısız ({$r['disk']}): ".implode(', ', array_keys(array_filter($r['steps'], fn ($v) => ! $v))).'.');
     }
 
     public function leads(Request $request): View

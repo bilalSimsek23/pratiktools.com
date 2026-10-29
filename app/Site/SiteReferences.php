@@ -193,13 +193,18 @@ final class SiteReferences
         if (! in_array($variant, ['light', 'dark'], true)) {
             throw new SiteError('Geçersiz logo türü.');
         }
-        $this->find($id);
-        $mediaId = $file === null ? null : $this->media->upload($file, $alt, $actor);
         $col = $variant === 'light' ? 'logo_media_id' : 'logo_dark_media_id';
+        $previous = $this->find($id)->{$col};
+        // The new file is stored (and its row written) before anything points at it.
+        $mediaId = $file === null ? null : $this->media->upload($file, $alt, $actor);
         DB::table('site_references')->where('id', $id)->update([$col => $mediaId,
             ...($variant === 'light' ? ['logo_use_approved' => false, 'logo_approved_by' => null, 'logo_approved_at' => null] : []), 'updated_by' => self::by($actor), 'updated_at' => now()]);
         $this->audit->record(AuditAction::SiteReferenceLogoChanged, 'site_reference', $id, ['variant' => $variant, 'removed' => $mediaId === null], $actor);
         SiteContents::bump();
+        // Only now drop the old logo, if nothing else uses it (no orphans).
+        if ($previous !== null && $previous !== $mediaId) {
+            $this->media->delete((string) $previous, $actor);
+        }
     }
 
     public function find(string $id, bool $lock = false): object

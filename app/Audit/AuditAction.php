@@ -84,6 +84,8 @@ enum AuditAction: string
     case SiteCategoryChanged = 'site.category_changed';
     case SiteSettingsChanged = 'site.settings_changed';
     case SiteMediaUploaded = 'site.media_uploaded';
+    case SiteMediaDeleted = 'site.media_deleted';
+    case SiteStorageChecked = 'site.storage_checked';
     case SiteInquiryChanged = 'site.inquiry_changed';
     case SiteReferenceCreated = 'site.reference_created';
     case SiteReferenceChanged = 'site.reference_changed';

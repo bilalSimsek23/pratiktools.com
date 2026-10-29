@@ -107,6 +107,8 @@ Route::middleware('auth:web')->group(function () {
             Route::post('leads/{inquiry}', [WebsiteController::class, 'leadStatus'])->whereUuid('inquiry')->name('leads.status');
             Route::get('media', [WebsiteController::class, 'media'])->name('media');
             Route::post('media', [WebsiteController::class, 'upload'])->middleware('throttle:20,1')->name('media.upload');
+            Route::post('media/{media}/delete', [WebsiteController::class, 'deleteMedia'])->whereUuid('media')->middleware(PanelRecentAuth::class)->name('media.delete');
+            Route::post('storage-check', [WebsiteController::class, 'storageCheck'])->middleware([PanelRecentAuth::class, 'throttle:6,1'])->name('storage-check');
             Route::get('settings', [WebsiteController::class, 'settings'])->name('settings');
             Route::post('settings/{group}', [WebsiteController::class, 'saveSettings'])->where('group', 'organization|analytics|crawlers|owner|media|delivery')->middleware(PanelRecentAuth::class)->name('settings.save');
             Route::post('categories/{kind}', [WebsiteController::class, 'saveCategory'])->where('kind', 'service|article')->name('categories.save');

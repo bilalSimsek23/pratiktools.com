@@ -49,6 +49,11 @@ final class SiteMedia
         if ($width < 16 || $height < 16 || $width * $height > (int) config('site.media_max_pixels')) {
             throw new SiteError('Görsel boyutu desteklenmiyor.');
         }
+        $sha = hash_file('sha256', $path);
+        $existing = DB::table('site_media')->where('sha256', $sha)->value('id');
+        if ($existing !== null) {
+            return (string) $existing;
+        }
         $image = match ($info[2]) {
             IMAGETYPE_JPEG => @imagecreatefromjpeg($path),
             IMAGETYPE_PNG => @imagecreatefrompng($path),
@@ -58,37 +63,89 @@ final class SiteMedia
             throw new SiteError('Görsel okunamadı.');
         }
 
-        $sha = hash_file('sha256', $path);
-        $existing = DB::table('site_media')->where('sha256', $sha)->value('id');
-        if ($existing !== null) {
-            return (string) $existing;
-        }
-
         $id = (string) Str::uuid7();
         $variants = ['webp' => [], 'jpg' => []];
-        foreach (array_unique([...array_filter((array) config('site.media_widths'), fn ($w) => $w < $width), min($width, max((array) config('site.media_widths')))]) as $w) {
-            $scaled = $w === $width ? $image : imagescale($image, (int) $w);
-            if (! $scaled instanceof GdImage) {
-                continue;
+        $written = [];
+        try {
+            $storage = Storage::disk($disk);
+            foreach (array_unique([...array_filter((array) config('site.media_widths'), fn ($w) => $w < $width), min($width, max((array) config('site.media_widths')))]) as $w) {
+                $scaled = $w === $width ? $image : imagescale($image, (int) $w);
+                if (! $scaled instanceof GdImage) {
+                    continue;
+                }
+                foreach (['webp' => fn ($img) => imagewebp($img, null, 82), 'jpg' => fn ($img) => imagejpeg($this->flatten($img), null, 84)] as $ext => $encode) {
+                    ob_start();
+                    $encode($scaled);
+                    $bytes = (string) ob_get_clean();
+                    // Content-addressed by the media id: a replaced image gets a new id and URL.
+                    $key = "site-media/{$id}/{$w}.{$ext}";
+                    if ($storage->put($key, $bytes) !== true) {
+                        throw new \RuntimeException('write refused');
+                    }
+                    $written[] = $key;
+                    $variants[$ext][(string) $w] = $key;
+                }
+                if ($scaled !== $image) {
+                    imagedestroy($scaled);
+                }
             }
-            foreach (['webp' => fn ($img) => imagewebp($img, null, 82), 'jpg' => fn ($img) => imagejpeg($this->flatten($img), null, 84)] as $ext => $encode) {
-                ob_start();
-                $encode($scaled);
-                $bytes = (string) ob_get_clean();
-                $key = "site-media/{$id}/{$w}.{$ext}";
-                Storage::disk($disk)->put($key, $bytes);
-                $variants[$ext][(string) $w] = $key;
-            }
-            if ($scaled !== $image) {
-                imagedestroy($scaled);
-            }
+            DB::table('site_media')->insert(['id' => $id, 'sha256' => $sha, 'disk' => $disk, 'alt' => $alt, 'width' => $width, 'height' => $height,
+                'variants' => json_encode($variants), 'created_by' => mb_substr($actor->type.':'.$actor->id, 0, 64), 'created_at' => now()]);
+        } catch (\Throwable $e) {
+            // All or nothing: no row without files, no files without a row.
+            $this->forget($disk, $written);
+            report($e);
+
+            throw new SiteError('Görsel depolamaya yazılamadı. Depolama şu anda kullanılamıyor olabilir; lütfen daha sonra tekrar deneyin.');
+        } finally {
+            imagedestroy($image);
         }
-        imagedestroy($image);
-        DB::table('site_media')->insert(['id' => $id, 'sha256' => $sha, 'disk' => $disk, 'alt' => $alt, 'width' => $width, 'height' => $height,
-            'variants' => json_encode($variants), 'created_by' => mb_substr($actor->type.':'.$actor->id, 0, 64), 'created_at' => now()]);
-        $this->audit->record(AuditAction::SiteMediaUploaded, 'site_media', $id, ['width' => $width, 'height' => $height], $actor);
+        $this->audit->record(AuditAction::SiteMediaUploaded, 'site_media', $id, ['width' => $width, 'height' => $height, 'disk' => $disk], $actor);
 
         return $id;
+    }
+
+    /**
+     * Where a media item is used (content social images, reference logos).
+     */
+    public static function usage(string $id): int
+    {
+        return DB::table('site_contents')->where('social_image_id', $id)->count()
+            + DB::table('site_references')->where(fn ($q) => $q->where('logo_media_id', $id)->orWhere('logo_dark_media_id', $id))->count();
+    }
+
+    /**
+     * Deletes a media item that nothing uses: the row first (the site never
+     * points at a missing file), then its files. Returns false if in use.
+     */
+    public function delete(string $id, Actor $actor): bool
+    {
+        $row = DB::table('site_media')->where('id', $id)->first(['disk', 'variants']);
+        if ($row === null || self::usage($id) > 0) {
+            return false;
+        }
+        DB::table('site_media')->where('id', $id)->delete();
+        $this->forget((string) $row->disk, array_merge(...array_map('array_values', array_values((array) json_decode((string) $row->variants, true)))));
+        $this->audit->record(AuditAction::SiteMediaDeleted, 'site_media', $id, [], $actor);
+
+        return true;
+    }
+
+    /**
+     * Best effort: a file left behind is reported, never fatal.
+     *
+     * @param  list<string>  $keys
+     */
+    private function forget(string $disk, array $keys): void
+    {
+        if ($keys === []) {
+            return;
+        }
+        try {
+            Storage::disk($disk)->delete($keys);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

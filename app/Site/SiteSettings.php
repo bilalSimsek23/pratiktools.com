@@ -55,9 +55,15 @@ final class SiteSettings
         };
     }
 
+    /**
+     * Saved choice, else SITE_MEDIA_DISK, else Laravel Cloud's attached
+     * "site-media" disk when it is configured, else local.
+     */
     public function mediaDisk(): string
     {
-        return (string) ($this->get('media')['disk'] ?: config('site.media_disk'));
+        $cloud = (string) config('site.cloud_media_disk');
+
+        return (string) ($this->get('media')['disk'] ?: config('site.media_disk') ?: (config("filesystems.disks.{$cloud}") !== null ? $cloud : 'local'));
     }
 
     /**
