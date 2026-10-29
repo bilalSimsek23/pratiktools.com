@@ -159,6 +159,26 @@ passwords are stored only as hashes.
 4. In Site Ayarları: contact details, KVKK URL, analytics ids, GPTBot policy.
 5. Review the starting content; fill in and publish case studies.
 
+## Media technologies catalog
+
+Category "Medya Teknolojileri & Prodüksiyon Otomasyonu"
+(`medya-teknolojileri-ve-produksiyon-otomasyonu`) with 8 service pages
+(video & ses prodüksiyonu, After Effects script & panel, Premiere Pro
+otomasyonları, render otomasyonu, render farm sistemleri, toplu video ve
+içerik üretimi, özel prodüksiyon araçları, AI destekli medya iş akışları) and
+4 landing pages (`/cozumler/after-effects-otomasyonu`,
+`/cozumler/premiere-pro-otomasyonu`, `/cozumler/render-farm-kurulumu`,
+`/cozumler/video-produksiyon-otomasyonu`). Installed once by a migration
+(`MediaCatalog`, missing slugs only, internal links between the new pages);
+from then on everything is edited in the panel. Adobe product pages carry a
+trademark note (no partnership implied). No reference is linked
+automatically.
+
+The home page's main service cards are the CMS field "Ana hizmet kartları"
+(`capability_cards`: one `Başlık | açıklama | /bağlantı` per line, site paths
+only). The broader home message was applied only where the home page still
+had its first texts (`InitialContent::upgradeHome`); panel edits are kept.
+
 ## References (Referanslar)
 
 `site_references` ("we worked with") is separate from projects/case studies
