@@ -30,6 +30,11 @@ final class KekMaintenance
 
     public const INVENTORY_UNAVAILABLE = 'inventory_unavailable';
 
+    /**
+     * Which step verify() reached, for a failure diagnostic (no data).
+     */
+    public string $stage = 'not_started';
+
     public function __construct(
         private readonly KeyEncryptionService $kms,
         private readonly SecretVault $vault,
@@ -116,8 +121,10 @@ final class KekMaintenance
             $rows[] = ['check' => $check, 'kek_id' => $kekId, 'result' => $result];
         };
 
+        $this->stage = 'current_kek_self_test';
         $add('current KEK wraps and unwraps', $this->kms->currentKeyId(), $this->currentKeyWorks() ? self::OK : self::CURRENT_KEY_FAILED);
 
+        $this->stage = 'data_key_inventory';
         $inventory = $this->inventory();
         if ($inventory === null || $inventory === []) {
             $add('data keys in use', null, self::BOOTSTRAP);
@@ -125,7 +132,9 @@ final class KekMaintenance
             return ['ok' => collect($rows)->every(fn ($r) => in_array($r['result'], [self::OK, self::BOOTSTRAP], true)), 'rows' => $rows];
         }
 
+        $this->stage = 'data_key_samples';
         $samples = collect(DB::select('SELECT * FROM app_kek_samples()'))->keyBy('kek_id');
+        $this->stage = 'sample_data_key_unwrap';
         foreach ($inventory as $row) {
             $id = $row['kek_id'];
             if ($production && str_starts_with($id, LocalKeyEncryptionService::PREFIX)) {
@@ -147,6 +156,8 @@ final class KekMaintenance
             }
             $add("sample data key unwraps ({$row['data_keys']} data keys, {$row['tenants']} tenants)", $id, $opens ? self::OK : self::WRONG_KEK);
         }
+
+        $this->stage = 'done';
 
         return ['ok' => collect($rows)->every(fn ($r) => $r['result'] === self::OK), 'rows' => $rows];
     }
@@ -178,7 +189,12 @@ final class KekMaintenance
 
     private function inventoryAvailable(): bool
     {
-        return Schema::hasTable('tenant_data_keys')
-            && DB::selectOne("SELECT to_regprocedure('app_kek_inventory()') IS NOT NULL AS present")->present;
+        $this->stage = 'data_key_table_check';
+        $table = Schema::hasTable('tenant_data_keys');
+        $this->stage = 'data_key_inventory_function_check';
+        $present = $table && DB::selectOne("SELECT to_regprocedure('app_kek_inventory()') IS NOT NULL AS present")->present;
+        $this->stage = 'data_key_inventory';
+
+        return $present;
     }
 }
