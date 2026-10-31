@@ -50,10 +50,22 @@
     </div>
     <div class="card form-grid">
         <h2>SEO ve paylaşım</h2>
-        <label>SEO başlığı (≤ 70) <input type="text" name="seo_title" maxlength="70" value="{{ $v('seo_title', $c->seo_title) }}"></label>
-        <label>Meta açıklama (≤ 170) <textarea name="seo_description" maxlength="170" rows="3">{{ $v('seo_description', $c->seo_description) }}</textarea></label>
-        <label>Paylaşım görseli <select name="social_image_id"><option value="">—</option>@foreach ($media as $m)<option value="{{ $m->id }}" @selected($v('social_image_id', $c->social_image_id) === $m->id)>{{ $m->alt }} ({{ $m->width }}×{{ $m->height }})</option>@endforeach</select>
-            <span class="hint"><a href="{{ route('panel.website.media') }}">Görsel yükle</a></span></label>
+        <p class="hint">Boş bırakılan alan sırasıyla içeriğin kendi değerine (başlık, özet), sonra Site Ayarları › SEO / Marka değerlerine düşer.</p>
+        <label>SEO başlığı <span class="count" data-count-for="seo_title" data-ideal="60"></span>
+            <input type="text" name="seo_title" maxlength="200" value="{{ $v('seo_title', $c->seo_title) }}" placeholder="{{ $c->title }}"></label>
+        <label>Meta açıklama <span class="count" data-count-for="seo_description" data-ideal="155"></span>
+            <textarea name="seo_description" maxlength="400" rows="3" placeholder="Boşsa özet kullanılır">{{ $v('seo_description', $c->seo_description) }}</textarea></label>
+        <div><span class="small muted">Google önizlemesi</span>
+            <div class="serp" data-serp data-site="{{ $seoDefaults['site'] }}" data-suffix="{{ $seoDefaults['title_suffix'] }}" data-title-inputs="seo_title,title"
+                data-desc-inputs="seo_description,excerpt" data-desc-default="{{ $seoDefaults['default_description'] }}" data-base="{{ $seoDefaults['base'] }}" data-path="{{ $publicUrl }}">
+                <div class="serp-url"></div><div class="serp-title"></div><div class="serp-desc"></div></div></div>
+        <label>Open Graph başlığı <span class="count" data-count-for="og_title" data-ideal="70"></span>
+            <input type="text" name="og_title" maxlength="200" value="{{ $v('og_title', $c->og_title) }}" placeholder="Boşsa SEO başlığı / başlık"></label>
+        <label>Open Graph açıklaması <span class="count" data-count-for="og_description" data-ideal="200"></span>
+            <textarea name="og_description" maxlength="400" rows="2" placeholder="Boşsa meta açıklama / özet">{{ $v('og_description', $c->og_description) }}</textarea></label>
+        <label>Open Graph görseli <select name="social_image_id"><option value="">— {{ $defaultOgImage ? 'Varsayılan paylaşım görseli (Site Ayarları)' : 'Yok' }}</option>@foreach ($media as $m)<option value="{{ $m->id }}" @selected($v('social_image_id', $c->social_image_id) === $m->id)>{{ $m->alt }} ({{ $m->width }}×{{ $m->height }})</option>@endforeach</select>
+            <span class="hint">Önerilen 1200×630. <a href="{{ route('panel.website.media') }}">Görsel yükle</a></span></label>
+        <label class="small"><input type="checkbox" name="robots_noindex" value="1" @checked($v('robots_noindex', $c->robots_noindex))> Arama motorları bu sayfayı indekslemesin (noindex; sitemap'ten de çıkarılır)</label>
     </div>
     <div class="card form-grid">
         <h2>İlgili içerikler (iç bağlantılar)</h2>
@@ -82,4 +94,5 @@
     @endif
 </div>
 @endif
+@include('panel.website._seo-preview')
 @endsection

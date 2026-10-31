@@ -14,6 +14,7 @@ use App\Http\Controllers\Panel\WebsiteController;
 use App\Http\Middleware\EnsureSiteOwner;
 use App\Http\Middleware\PanelRecentAuth;
 use App\Http\Middleware\PanelTenant;
+use App\Site\SiteBrand;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -110,7 +111,9 @@ Route::middleware('auth:web')->group(function () {
             Route::post('media/{media}/delete', [WebsiteController::class, 'deleteMedia'])->whereUuid('media')->middleware(PanelRecentAuth::class)->name('media.delete');
             Route::post('storage-check', [WebsiteController::class, 'storageCheck'])->middleware([PanelRecentAuth::class, 'throttle:6,1'])->name('storage-check');
             Route::get('settings', [WebsiteController::class, 'settings'])->name('settings');
-            Route::post('settings/{group}', [WebsiteController::class, 'saveSettings'])->where('group', 'organization|analytics|crawlers|owner|media|delivery')->middleware(PanelRecentAuth::class)->name('settings.save');
+            Route::post('settings/brand/{slot}', [WebsiteController::class, 'brandImage'])->where('slot', implode('|', array_keys(SiteBrand::IMAGES)))
+                ->middleware([PanelRecentAuth::class, 'throttle:20,1'])->name('settings.brand-image');
+            Route::post('settings/{group}', [WebsiteController::class, 'saveSettings'])->where('group', 'organization|analytics|crawlers|owner|media|delivery|brand|seo|social')->middleware(PanelRecentAuth::class)->name('settings.save');
             Route::post('categories/{kind}', [WebsiteController::class, 'saveCategory'])->where('kind', 'service|article')->name('categories.save');
             Route::get('content/{content}', [WebsiteController::class, 'edit'])->whereUuid('content')->name('edit');
             Route::post('content/{content}', [WebsiteController::class, 'update'])->whereUuid('content')->name('update');

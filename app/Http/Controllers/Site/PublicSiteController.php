@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Site\ContentType;
 use App\Site\InitialContent;
 use App\Site\SiteAnalytics;
+use App\Site\SiteBrand;
 use App\Site\SiteInquiries;
 use App\Site\SiteMarkdown;
 use App\Site\SiteQuery;
@@ -26,12 +27,15 @@ final class PublicSiteController extends Controller
         private readonly SiteSettings $settings,
         private readonly SiteAnalytics $analytics,
         private readonly SiteInquiries $inquiries,
+        private readonly SiteBrand $brand,
     ) {}
 
     public function home(): Response
     {
         $page = $this->site->find(ContentType::Page, 'home') ?? InitialContent::fallbackHome();
         $services = $this->site->published(ContentType::Service);
+        // Home title: its SEO title, else the default SEO title, else the site name.
+        $meta = $this->seo->forContent(['title' => '', 'url' => '/'] + $page, (string) ($page['excerpt'] ?? ''));
 
         return $this->render('site.home', [
             'page' => $page,
@@ -41,7 +45,7 @@ final class PublicSiteController extends Controller
             'projects' => $this->site->published(ContentType::Project, limit: 6, featuredOnly: true),
             'references' => $this->site->references(featuredOnly: true),
             'articles' => $this->site->published(ContentType::Article, limit: 3),
-        ], $this->seo->meta($page['seo_title'] ?? 'PratikTools', $page['seo_description'] ?? $page['excerpt'], '/'), [$this->seo->organization(), $this->seo->website()], 'page_view');
+        ], $meta, [$this->seo->organization(), $this->seo->website()], 'page_view');
     }
 
     public function index(Request $request, string $type): Response
@@ -84,7 +88,7 @@ final class PublicSiteController extends Controller
 
         return $this->render('site.show', ['type' => $type, 'item' => $item, 'html' => SiteMarkdown::render($item['body']), 'crumbs' => $crumbs,
             'otherProjects' => $type === ContentType::Project ? array_slice(array_filter($this->site->published(ContentType::Project), fn ($p) => $p['id'] !== $item['id']), 0, 3) : []],
-            $this->seo->meta($item['seo_title'] ?: $item['title'], $description, $item['url'], image: $item['image'], ogType: $type === ContentType::Article ? 'article' : 'website'),
+            $this->seo->forContent($item, $description, $type === ContentType::Article ? 'article' : 'website'),
             [$this->seo->organization(), $schema, $faq, $this->seo->breadcrumbs($crumbs)], $type->value.'_view');
     }
 
@@ -94,7 +98,7 @@ final class PublicSiteController extends Controller
         $crumbs = [['Ana Sayfa', '/'], [$item['title'], $item['url']]];
 
         return $this->render($slug === 'iletisim' ? 'site.contact' : 'site.page', ['item' => $item, 'html' => SiteMarkdown::render((string) ($item['body'] ?? '')), 'crumbs' => $crumbs],
-            $this->seo->meta(($item['seo_title'] ?? null) ?: $item['title'], ($item['seo_description'] ?? null) ?: $item['excerpt'], $item['url']),
+            $this->seo->forContent($item, (string) ($item['excerpt'] ?? '')),
             [$this->seo->organization(), $this->seo->breadcrumbs($crumbs)], 'page_view');
     }
 
@@ -133,7 +137,7 @@ final class PublicSiteController extends Controller
 
         return response()->view($view, $data + [
             'meta' => $meta, 'jsonLd' => $schema === [] ? null : SiteSeo::jsonLd($schema), 'event' => $event,
-            'org' => $this->settings->get('organization'), 'analytics' => $this->analytics->config(),
+            'org' => $this->settings->get('organization'), 'brand' => $this->brand->view(), 'analytics' => $this->analytics->config(),
             'serviceCategories' => $this->site->categories('service'), 'formStamp' => SiteInquiries::stamp(),
             'interests' => $this->inquiries->interests(), 'inquiryAvailable' => $this->inquiries->available(),
         ], $status)->header('Cache-Control', $status === 200 && ($meta['robots'] ?? '') !== '' ? 'public, max-age='.$this->settings->cacheSeconds() : 'no-store')

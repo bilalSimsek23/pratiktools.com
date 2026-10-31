@@ -52,7 +52,7 @@ final class SiteQuery
             if ($r === null) {
                 return null;
             }
-            $item = self::row($r) + ['body' => (string) $r->body, 'seo_title' => $r->seo_title, 'seo_description' => $r->seo_description];
+            $item = self::row($r) + self::seo($r) + ['body' => (string) $r->body];
             $item['related'] = DB::table('site_content_relations as rel')->join('site_contents as c', 'c.id', '=', 'rel.related_id')
                 ->where('c.status', ContentStatus::Published->value)
                 ->where(fn ($q) => $q->where('rel.content_id', $r->id))
@@ -78,8 +78,7 @@ final class SiteQuery
         $r = DB::table('site_contents as c')->leftJoin('site_categories as k', 'k.id', '=', 'c.category_id')->where('c.id', $id)
             ->first(['c.*', 'k.name as category_name', 'k.slug as category_slug']);
 
-        return $r === null ? null : self::row($r) + ['body' => (string) $r->body, 'seo_title' => $r->seo_title, 'seo_description' => $r->seo_description,
-            'related' => [], 'referenced_by' => [], 'status' => (string) $r->status];
+        return $r === null ? null : self::row($r) + self::seo($r) + ['body' => (string) $r->body, 'related' => [], 'referenced_by' => [], 'status' => (string) $r->status];
     }
 
     /**
@@ -132,13 +131,24 @@ final class SiteQuery
     }
 
     /**
-     * Every published URL with its last change (sitemap).
+     * Page-level SEO fields (empty: SiteSeo falls back to content, then settings).
+     *
+     * @return array{seo_title: ?string, seo_description: ?string, og_title: ?string, og_description: ?string, robots_noindex: bool}
+     */
+    private static function seo(object $r): array
+    {
+        return ['seo_title' => $r->seo_title, 'seo_description' => $r->seo_description, 'og_title' => $r->og_title ?? null, 'og_description' => $r->og_description ?? null,
+            'robots_noindex' => (bool) ($r->robots_noindex ?? false)];
+    }
+
+    /**
+     * Every published, indexable URL with its last change (sitemap).
      *
      * @return list<array{loc: string, lastmod: ?string}>
      */
     public function sitemap(): array
     {
-        return $this->cached('sitemap', fn () => [...DB::table('site_contents')->where('status', ContentStatus::Published->value)
+        return $this->cached('sitemap', fn () => [...DB::table('site_contents')->where('status', ContentStatus::Published->value)->where('robots_noindex', false)
             ->orderBy('type')->orderBy('sort_order')->get(['type', 'slug', 'updated_at'])
             ->map(fn ($r) => ['loc' => self::url($r->type, $r->slug), 'lastmod' => $r->updated_at === null ? null : substr((string) $r->updated_at, 0, 10)])->all(),
             ...array_map(fn ($r) => ['loc' => $r['url'], 'lastmod' => $r['updated_at'] === null ? null : substr((string) $r['updated_at'], 0, 10)],

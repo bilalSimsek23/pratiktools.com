@@ -27,14 +27,14 @@ final class SiteFilesController extends Controller
         $disallow = implode("\n", array_map(fn ($p) => 'Disallow: '.$p, (array) config('site.disallow_paths')));
         $gptbot = $settings->get('crawlers')['gptbot'] === 'allow' ? "Allow: /\n{$disallow}" : 'Disallow: /';
         $body = "User-agent: *\nAllow: /\n{$disallow}\n\nUser-agent: OAI-SearchBot\nAllow: /\n{$disallow}\n\nUser-agent: GPTBot\n{$gptbot}\n\n"
-            .'Sitemap: '.rtrim((string) config('app.url'), '/')."/sitemap.xml\n";
+            .'Sitemap: '.$settings->canonicalBase()."/sitemap.xml\n";
 
         return response($body, 200, ['Content-Type' => 'text/plain; charset=utf-8', 'Cache-Control' => 'public, max-age=3600']);
     }
 
-    public function sitemap(SiteQuery $site): Response
+    public function sitemap(SiteQuery $site, SiteSettings $settings): Response
     {
-        $base = rtrim((string) config('app.url'), '/');
+        $base = $settings->canonicalBase();
         $urls = [['loc' => '/', 'lastmod' => null], ...array_map(fn ($p) => ['loc' => $p, 'lastmod' => null], ['/hizmetler', '/cozumler', '/projeler', '/referanslar', '/blog']),
             ...array_values(array_filter($site->sitemap(), fn ($u) => $u['loc'] !== '/'))];
         $seen = [];
@@ -73,7 +73,7 @@ final class SiteFilesController extends Controller
         return response()->stream(function () use ($stream) {
             fpassthru($stream);
             fclose($stream);
-        }, 200, ['Content-Type' => $ext === 'webp' ? 'image/webp' : 'image/jpeg', 'Cache-Control' => 'public, max-age=31536000, immutable', 'Content-Disposition' => 'inline']);
+        }, 200, ['Content-Type' => ['webp' => 'image/webp', 'png' => 'image/png'][$ext] ?? 'image/jpeg', 'Cache-Control' => 'public, max-age=31536000, immutable', 'Content-Disposition' => 'inline']);
     }
 
     public function event(Request $request, SiteEvents $events): Response

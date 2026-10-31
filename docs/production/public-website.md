@@ -115,6 +115,33 @@ BlogPosting (articles), BreadcrumbList, FAQPage only when the FAQ is shown.
 Everything important is in the server-rendered HTML; no auth or CAPTCHA for
 crawlers.
 
+### Brand and SEO settings (no deploy needed)
+
+Fallback order for every meta value: the page's SEO field → the page's own
+content (title, excerpt, body) → Site Ayarları (SEO / Marka).
+
+| Output | Source |
+|---|---|
+| `<title>` | page SEO title → page title → default SEO title → site name; then the title suffix (default: a pipe and the site name) unless the title already contains it |
+| meta description | page meta description → excerpt / body → default meta description |
+| `og:title` / `twitter:title` | page OG title → the title above (without suffix) |
+| `og:description` / `twitter:description` | page OG description → meta description |
+| `og:image` / `twitter:image` | page share image → default share image (Marka); none: `twitter:card=summary` |
+| canonical, `og:url`, sitemap, robots.txt `Sitemap:` | canonical base URL (https in production) → APP_URL |
+| meta robots | page noindex, or site-wide index/follow switches; noindex pages leave the sitemap |
+| favicon / Apple Touch Icon | Marka uploads as PNG (32/48/192, 180) → `/favicon.ico` |
+| header / footer logo | logo for the chosen background (açık / koyu) → footer falls back to the header logo → text brand |
+| Organization | organization name/description (SEO), light-background logo, e-mail/phone if set, `sameAs` = filled social profiles + other profile links. Never an invented address or profile |
+| WebSite | site name, short name as `alternateName` |
+
+Brand images use the SiteMedia pipeline (JPEG/PNG/WebP only, no SVG, type
+from the bytes, re-encoded). Icons must be square (favicon ≥ 48 px, Apple
+Touch Icon ≥ 180 px) and are stored as PNG (`site_media.kind = icon`). A
+replaced image gets a new id and URL (no stale cache) and the old one is
+deleted when nothing else uses it; images in use cannot be deleted from the
+media library. Production uploads need object storage (no local fallback).
+Every change bumps the site cache version.
+
 ## Measurement
 
 First-party counters without cookies or personal data (`site_events_daily`):
@@ -165,6 +192,9 @@ password confirmation, audited):
 | GPTBot policy | `crawlers` | allow / disallow |
 | Image disk | `media` | One of the configured disks; production accepts only a persistent (object storage) disk |
 | Page cache seconds | `delivery` | 0–3600 |
+| Site name, short name, header/footer background, brand image ids | `brand` | Images only via the upload endpoint (SiteMedia pipeline) |
+| Default title, title suffix, default description, canonical base, organization name/description, robots index/follow | `seo` | Canonical base: scheme + host only, https in production |
+| LinkedIn, Instagram, YouTube, Facebook, X profile URLs | `social` | https, on that network's domain; empty ones are never output |
 | Website lead form | `lead_form` | Written by `site:setup` |
 
 Environment variables (`SITE_OWNER_TENANT`, `SITE_LEAD_FORM`,

@@ -1,0 +1,2 @@
+{{-- Brand logo from Site Ayarları › Marka; without one, the text brand. --}}
+@if ($logo)<img class="brand-logo" src="{{ \App\Site\SiteBrand::logoSrc($logo) }}" alt="{{ $brand['name'] }}" width="{{ (int) round($logo['width'] * 36 / max(1, $logo['height'])) }}" height="36" decoding="async">@else<span class="brand-mark" aria-hidden="true">{{ mb_strtoupper(mb_substr($brand['short'], 0, 1)) }}</span>{{ $brand['short'] }}@endif

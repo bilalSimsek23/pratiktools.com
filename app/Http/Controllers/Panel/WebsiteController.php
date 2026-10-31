@@ -7,6 +7,7 @@ use App\Http\Controllers\Panel\Concerns\PanelHelpers;
 use App\Http\Controllers\Site\PublicSiteController;
 use App\Site\ContentStatus;
 use App\Site\ContentType;
+use App\Site\SiteBrand;
 use App\Site\SiteCategories;
 use App\Site\SiteContents;
 use App\Site\SiteError;
@@ -64,7 +65,9 @@ final class WebsiteController extends Controller
 
         return view('panel.website.edit', ['c' => $row, 'type' => $type, 'data' => (array) json_decode((string) $row->data, true),
             'categories' => $type->categoryKind() === null ? collect() : DB::table('site_categories')->where('kind', $type->categoryKind())->orderBy('sort_order')->get(['id', 'name']),
-            'media' => DB::table('site_media')->orderByDesc('created_at')->limit(100)->get(['id', 'alt', 'width', 'height']),
+            'media' => DB::table('site_media')->where('kind', 'image')->orderByDesc('created_at')->limit(100)->get(['id', 'alt', 'width', 'height']),
+            'seoDefaults' => ['site' => app(SiteSettings::class)->get('brand')['site_name'], 'base' => app(SiteSettings::class)->canonicalBase()] + app(SiteSettings::class)->get('seo'),
+            'defaultOgImage' => app(SiteSettings::class)->get('brand')['og_image'] !== '',
             'relatable' => DB::table('site_contents')->where('id', '<>', $row->id)->whereIn('type', ['service', 'solution', 'project', 'article'])->orderBy('type')->orderBy('title')->get(['id', 'type', 'title', 'status']),
             'related' => DB::table('site_content_relations')->where('content_id', $row->id)->pluck('related_id')->all(),
             'publicUrl' => SiteQuery::url($row->type, $row->slug),
@@ -78,10 +81,11 @@ final class WebsiteController extends Controller
         $type = ContentType::from($row->type);
         $fields = collect($type->fields())->mapWithKeys(fn ($f) => [$f['key'] => $f['kind'] === 'bool' ? 'nullable|boolean' : 'nullable|string|max:20000'])->all();
         $input = $request->validate($fields + ['title' => 'required|string|max:200', 'slug' => 'required|string|max:140', 'excerpt' => 'nullable|string|max:600',
-            'body' => 'nullable|string|max:60000', 'seo_title' => 'nullable|string|max:70', 'seo_description' => 'nullable|string|max:170', 'category_id' => 'nullable|uuid',
+            'body' => 'nullable|string|max:60000', 'seo_title' => 'nullable|string|max:200', 'seo_description' => 'nullable|string|max:400', 'category_id' => 'nullable|uuid',
+            'og_title' => 'nullable|string|max:200', 'og_description' => 'nullable|string|max:400', 'robots_noindex' => 'nullable|boolean',
             'social_image_id' => 'nullable|uuid', 'featured' => 'nullable|boolean', 'sort_order' => 'nullable|integer|min:-1000|max:1000', 'related' => 'nullable|array|max:30', 'related.*' => 'uuid']);
         try {
-            $contents->update($row->id, $input + ['related' => $input['related'] ?? [], 'featured' => $request->boolean('featured')], $this->actor());
+            $contents->update($row->id, $input + ['related' => $input['related'] ?? [], 'featured' => $request->boolean('featured'), 'robots_noindex' => $request->boolean('robots_noindex')], $this->actor());
         } catch (SiteError $e) {
             return $this->failed($e->getMessage());
         }
@@ -123,7 +127,7 @@ final class WebsiteController extends Controller
         $this->authorizePanel(Permission::SiteView);
         $item = $query->preview($content) ?? abort(404);
         $type = ContentType::from($item['type']);
-        $meta = $seo->meta(($item['seo_title'] ?? null) ?: $item['title'], $item['excerpt'], $item['url'], index: false);
+        $meta = $seo->forContent(['robots_noindex' => true] + $item, (string) $item['excerpt']);
         $crumbs = [['Ana Sayfa', '/'], [$item['title'], $item['url']]];
         $view = match (true) {
             $type === ContentType::Page && $item['slug'] === 'iletisim' => 'site.contact',
@@ -249,7 +253,31 @@ final class WebsiteController extends Controller
             'canSettings' => $this->can(Permission::SiteSettings), 'inquiryAvailable' => $inquiries->available(),
             'form' => $form === null ? null : DB::table('lead_forms')->where('tenant_id', $context->requireTenant())->where('public_id', $form)->first(['id', 'name', 'active', 'allowed_origins']),
             'origin' => SiteInquiries::origin(), 'owner' => $settings->ownerSlug(), 'mediaDisk' => $settings->mediaDisk(), 'cacheSeconds' => $settings->cacheSeconds(),
-            'disks' => collect((array) config('filesystems.disks'))->map(fn ($d) => (string) ($d['driver'] ?? ''))->all()]);
+            'disks' => collect((array) config('filesystems.disks'))->map(fn ($d) => (string) ($d['driver'] ?? ''))->all(),
+            'brand' => $settings->get('brand'), 'brandMedia' => collect(SiteBrand::IMAGES)->map(fn ($spec, $slot) => SiteMedia::describe($settings->get('brand')[$slot] ?: null))->all(),
+            'seo' => $settings->get('seo'), 'social' => $settings->get('social'), 'canonicalBase' => $settings->canonicalBase(),
+            // Production never falls back to the app's local disk for uploads.
+            'uploadsOff' => app()->isProduction() && ! SiteSettings::persistentDisk($settings->mediaDisk())]);
+    }
+
+    /**
+     * Uploads (through the SiteMedia pipeline) or removes a brand image.
+     */
+    public function brandImage(Request $request, string $slot, SiteBrand $brand): RedirectResponse
+    {
+        $this->authorizePanel(Permission::SiteSettings);
+        $d = $request->validate(['image' => 'nullable|file|max:'.(int) (config('site.media_max_bytes') / 1024), 'alt' => 'nullable|string|max:200']);
+        $remove = $request->boolean('remove');
+        if (! $remove && ! $request->hasFile('image')) {
+            return $this->failed('Bir görsel seçin.');
+        }
+        try {
+            $brand->setImage($slot, $remove ? null : $request->file('image'), (string) ($d['alt'] ?? ''), $this->actor());
+        } catch (SiteError $e) {
+            return $this->failed($e->getMessage());
+        }
+
+        return $this->done($remove ? 'Görsel kaldırıldı.' : 'Görsel yüklendi; sitede yeni adresiyle hemen kullanılır.');
     }
 
     public function saveSettings(Request $request, string $group, SiteSettings $settings): RedirectResponse

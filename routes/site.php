@@ -26,5 +26,5 @@ Route::post('iletisim/talep', SiteInquiryController::class)->middleware('throttl
 
 Route::get('robots.txt', [SiteFilesController::class, 'robots'])->name('site.robots');
 Route::get('sitemap.xml', [SiteFilesController::class, 'sitemap'])->name('site.sitemap');
-Route::get('media/{id}/{width}.{ext}', [SiteFilesController::class, 'media'])->whereUuid('id')->where(['width' => '[0-9]{2,4}', 'ext' => 'webp|jpg'])->name('site.media');
+Route::get('media/{id}/{width}.{ext}', [SiteFilesController::class, 'media'])->whereUuid('id')->where(['width' => '[0-9]{2,4}', 'ext' => 'webp|jpg|png'])->name('site.media');
 Route::post('t', [SiteFilesController::class, 'event'])->middleware('throttle:site-events')->name('site.event');

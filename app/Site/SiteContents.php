@@ -88,7 +88,7 @@ final class SiteContents
                 throw new SiteError('Geçersiz kategori.');
             }
             $image = $input['social_image_id'] ?? $row->social_image_id;
-            if ($image !== null && $image !== '' && ! DB::table('site_media')->where('id', $image)->exists()) {
+            if ($image !== null && $image !== '' && ! DB::table('site_media')->where('id', $image)->where('kind', 'image')->exists()) {
                 throw new SiteError('Geçersiz görsel.');
             }
 
@@ -96,8 +96,11 @@ final class SiteContents
                 'title' => $title, 'slug' => $slug, 'excerpt' => self::text((string) ($input['excerpt'] ?? $row->excerpt), 600),
                 'body' => self::text((string) ($input['body'] ?? $row->body), 60000), 'data' => json_encode($data),
                 'category_id' => $category === '' ? null : $category, 'social_image_id' => $image === '' ? null : $image,
-                'seo_title' => self::line((string) ($input['seo_title'] ?? $row->seo_title), 70) ?: null,
-                'seo_description' => self::line((string) ($input['seo_description'] ?? $row->seo_description), 170) ?: null,
+                'seo_title' => self::line((string) ($input['seo_title'] ?? $row->seo_title), 200) ?: null,
+                'seo_description' => self::line((string) ($input['seo_description'] ?? $row->seo_description), 400) ?: null,
+                'og_title' => self::line((string) ($input['og_title'] ?? $row->og_title), 200) ?: null,
+                'og_description' => self::line((string) ($input['og_description'] ?? $row->og_description), 400) ?: null,
+                'robots_noindex' => (bool) ($input['robots_noindex'] ?? $row->robots_noindex),
                 'featured' => (bool) ($input['featured'] ?? $row->featured), 'sort_order' => (int) ($input['sort_order'] ?? $row->sort_order),
                 'updated_by' => self::by($actor), 'updated_at' => now(),
             ]);

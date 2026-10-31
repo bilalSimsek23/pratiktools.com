@@ -12,7 +12,15 @@
     @foreach ($meta['twitter'] as $k => $v)<meta name="{{ $k }}" content="{{ $v }}">
     @endforeach
     <meta name="theme-color" content="#0b1220">
+    @if ($brand['favicon'])
+    @foreach ($brand['favicon']['png'] as $s => $href)@if ((int) $s !== 180)<link rel="icon" type="image/png" sizes="{{ $s }}x{{ $s }}" href="{{ $href }}">
+    @endif @endforeach
+    @else
     <link rel="icon" href="/favicon.ico">
+    @endif
+    @isset($brand['apple_touch_icon']['png']['180'])<link rel="apple-touch-icon" sizes="180x180" href="{{ $brand['apple_touch_icon']['png']['180'] }}">
+    @endisset
+    <meta name="apple-mobile-web-app-title" content="{{ $brand['short'] }}">
     <link rel="stylesheet" href="/site/site.css?v={{ @filemtime(public_path('site/site.css')) }}">
     @if ($jsonLd)<script type="application/ld+json" nonce="{{ $cspNonce }}">{!! $jsonLd !!}</script>@endif
     <script type="application/json" id="pt-config" nonce="{{ $cspNonce }}">{!! json_encode(['analytics' => $analytics, 'event' => $event, 'path' => '/'.ltrim(request()->path(), '/')], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) !!}</script>
@@ -20,9 +28,9 @@
 </head>
 <body>
 <a class="skip" href="#main">İçeriğe geç</a>
-<header class="site-header">
+<header @class(['site-header', 'is-dark' => $brand['header']['background'] === 'dark'])>
     <div class="wrap header-row">
-        <a class="brand" href="/" aria-label="PratikTools ana sayfa"><span class="brand-mark" aria-hidden="true">P</span>PratikTools</a>
+        <a class="brand" href="/" aria-label="{{ $brand['name'] }} ana sayfa">@include('site.partials.brand', ['logo' => $brand['header']['logo']])</a>
         <nav class="nav" aria-label="Ana menü">
             <a href="/hizmetler" @class(['active' => request()->is('hizmetler*')])>Hizmetler</a>
             <a href="/cozumler" @class(['active' => request()->is('cozumler*')])>Çözümler</a>
@@ -37,10 +45,10 @@
 <main id="main">
 @yield('content')
 </main>
-<footer class="site-footer">
+<footer @class(['site-footer', 'is-dark' => $brand['footer']['background'] === 'dark'])>
     <div class="wrap footer-grid">
         <div>
-            <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span>PratikTools</a>
+            <a class="brand" href="/" aria-label="{{ $brand['name'] }} ana sayfa">@include('site.partials.brand', ['logo' => $brand['footer']['logo']])</a>
             <p class="muted small">Yazılım, otomasyon, yapay zekâ ve medya teknolojileri çözümleri.</p>
             @if ($org['email'])<p class="small"><a href="mailto:{{ $org['email'] }}" data-track="contact_click">{{ $org['email'] }}</a></p>@endif
             @if ($org['phone'])<p class="small"><a href="tel:{{ preg_replace('/[^0-9+]/', '', $org['phone']) }}" data-track="contact_click">{{ $org['phone'] }}</a></p>@endif
@@ -59,7 +67,7 @@
         </div>
     </div>
     <div class="wrap footer-bottom small muted">
-        <span>© {{ date('Y') }} PratikTools</span>
+        <span>© {{ date('Y') }} {{ $brand['name'] }}</span>
         <span>Adı geçen ürün ve marka adları sahiplerine aittir; anılmaları iş ortaklığı veya onay anlamına gelmez.</span>
     </div>
 </footer>

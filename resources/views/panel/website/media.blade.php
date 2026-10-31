@@ -16,7 +16,7 @@
     <table class="table"><thead><tr><th>Önizleme</th><th>Alt metin</th><th>Boyut</th><th>Kullanım</th><th>Yüklendi</th>@if ($canEdit)<th></th>@endif</tr></thead><tbody>
     @forelse ($media as $m)
         @php($d = \App\Site\SiteMedia::describe($m->id))
-        <tr><td>@if ($d && $d['jpg'])<img src="{{ reset($d['jpg']) }}" alt="" width="96" loading="lazy">@endif</td><td>{{ $m->alt }}</td><td class="small">{{ $m->width }}×{{ $m->height }}</td><td class="small">{{ $m->usage > 0 ? $m->usage.' yerde' : 'Kullanılmıyor' }}</td>
+        <tr><td>@if ($d && ($d['jpg'] || $d['png']))<img src="{{ $d['jpg'] ? reset($d['jpg']) : end($d['png']) }}" alt="" width="{{ $d['kind'] === 'icon' ? 48 : 96 }}" loading="lazy">@endif</td><td>{{ $m->alt }}</td><td class="small">{{ $m->width }}×{{ $m->height }}</td><td class="small">{{ $m->usage > 0 ? $m->usage.' yerde' : 'Kullanılmıyor' }}</td>
             <td class="small muted">{{ \Illuminate\Support\Carbon::parse($m->created_at)->format('d.m.Y H:i') }}</td>
             @if ($canEdit)<td>@if ($m->usage === 0)<form method="post" action="{{ route('panel.website.media.delete', $m->id) }}">@csrf<button class="btn btn-sm" type="submit">Sil</button></form>@endif</td>@endif</tr>
     @empty
