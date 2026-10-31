@@ -30,6 +30,8 @@ final class KekMaintenance
 
     public const INVENTORY_UNAVAILABLE = 'inventory_unavailable';
 
+    public const RUNTIME_ROLE = 'runtime_role_not_rls_bound';
+
     /**
      * Which step verify() reached, for a failure diagnostic (no data).
      */
@@ -56,6 +58,35 @@ final class KekMaintenance
             'active_keys' => (int) $r->active_keys,
             'tenants' => (int) $r->tenants,
         ], DB::select('SELECT * FROM app_kek_inventory()'));
+    }
+
+    /**
+     * Who the runtime connection really is (role names and attributes only).
+     *
+     * @return array{db_user: string, session_user: string, superuser: bool, bypass_rls: bool, privileged_member: bool}
+     */
+    public function runtimeRole(): array
+    {
+        $r = DB::selectOne("SELECT current_user AS u, session_user AS s, r.rolsuper AS su, r.rolbypassrls AS b,
+                EXISTS (SELECT 1 FROM pg_roles p WHERE p.rolname <> current_user AND (p.rolsuper OR p.rolbypassrls) AND pg_has_role(current_user, p.oid, 'MEMBER')) AS pm
+            FROM pg_roles r WHERE r.rolname = current_user");
+
+        return ['db_user' => (string) $r->u, 'session_user' => (string) $r->s, 'superuser' => (bool) $r->su, 'bypass_rls' => (bool) $r->b, 'privileged_member' => (bool) $r->pm];
+    }
+
+    /**
+     * The runtime connection must be the RLS-bound app role: not a superuser,
+     * no BYPASSRLS (also not through membership, e.g. neon_superuser), not
+     * the owner or platform role, and no SET ROLE in between. The configured
+     * name alone proves nothing: it comes from DB_USERNAME too.
+     *
+     * @param  array{db_user: string, session_user: string, superuser: bool, bypass_rls: bool, privileged_member: bool}  $role
+     */
+    public static function rlsBound(array $role): bool
+    {
+        return ! $role['superuser'] && ! $role['bypass_rls'] && ! $role['privileged_member'] && $role['db_user'] === $role['session_user']
+            && $role['db_user'] === config('database.roles.app')
+            && ! in_array($role['db_user'], [config('database.roles.owner'), config('database.roles.platform')], true);
     }
 
     /**
@@ -123,6 +154,16 @@ final class KekMaintenance
 
         $this->stage = 'current_kek_self_test';
         $add('current KEK wraps and unwraps', $this->kms->currentKeyId(), $this->currentKeyWorks() ? self::OK : self::CURRENT_KEY_FAILED);
+
+        // Before reading any key: a runtime that bypasses RLS must never go live.
+        $this->stage = 'runtime_role_check';
+        $role = $this->runtimeRole();
+        if (! self::rlsBound($role)) {
+            $add('runtime connection is the RLS-bound app role (db_user='.$role['db_user'].', bypass_rls='.json_encode($role['bypass_rls'] || $role['privileged_member']).', superuser='.json_encode($role['superuser']).')', null, self::RUNTIME_ROLE);
+
+            return ['ok' => false, 'rows' => $rows];
+        }
+        $add('runtime connection is the RLS-bound app role (db_user='.$role['db_user'].')', null, self::OK);
 
         $this->stage = 'data_key_inventory';
         $inventory = $this->inventory();

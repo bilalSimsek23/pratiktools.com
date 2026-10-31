@@ -60,6 +60,8 @@ final class VerifyDatabaseRoles extends Command
 
     public function handle(): int
     {
+        // The command object can be reused within one process (Artisan::call).
+        $this->rows = [];
         $roles = config('database.roles');
 
         foreach (['pgsql' => $roles['app'], 'pgsql_owner' => $roles['owner'], 'pgsql_platform' => $roles['platform']] as $connection => $expected) {

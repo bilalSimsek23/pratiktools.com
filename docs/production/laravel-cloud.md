@@ -35,6 +35,24 @@ The credential Laravel Cloud injects (`DB_USERNAME`/`DB_PASSWORD`, a
 `scripts/production/bootstrap-db-roles.sh` once. Custom environment
 variables override the injected ones, so the runtime never sees it.
 
+### Deploy gate: runtime role
+
+`vault:verify-kek` first proves the `pgsql` connection is the RLS-bound app
+role (`runtime_role_check`: not superuser, no BYPASSRLS directly or through
+membership such as `neon_superuser`, not the owner/platform role, no
+`SET ROLE`), before reading any key. The configured name alone proves
+nothing: `database.roles.app` also comes from `DB_USERNAME`.
+
+| Gate output | Meaning | Fix |
+|---|---|---|
+| `sqlstate=08006 … reason=password_authentication_failed` | `DB_USERNAME`/`DB_PASSWORD` do not match a role | Set the `saas_app` password as the custom `DB_PASSWORD` (rotate it with `bootstrap-db-roles.sh` if unknown) |
+| `stage=data_key_inventory … sqlstate=42501 object=function:app_kek_inventory … db_user=<not saas_app>` | The runtime connects with the injected administrator: `app_kek_inventory()` is executable only by `saas_app`/`saas_platform` | Restore the custom `DB_USERNAME=saas_app` **and** `DB_PASSWORD` (Cloud Secret with the `saas_app` password). Never grant the administrator EXECUTE |
+| `runtime_role_not_rls_bound` | Same, caught before any query that could fail | Same |
+
+Removing the custom `DB_PASSWORD` lets the injected administrator password
+win; authentication then succeeds only as the injected administrator, which
+must never be the runtime role.
+
 ## Order of operations
 
 1. **Platform KEK**: on a trusted workstation run `php artisan vault:generate-kek`;

@@ -49,7 +49,7 @@ class HealthChecker
 
     /**
      * The runtime connection must be the configured app role and must not
-     * be able to bypass row-level security.
+     * be able to bypass row-level security, directly or through membership.
      *
      * @return array<string, mixed>
      */
@@ -58,17 +58,17 @@ class HealthChecker
         $start = hrtime(true);
 
         try {
-            $role = DB::selectOne('SELECT current_user AS role, r.rolbypassrls AS bypass, r.rolsuper AS super FROM pg_roles r WHERE r.rolname = current_user');
-            $expected = config('database.roles.app');
-            $ok = $role !== null && ! $role->bypass && ! $role->super && $role->role === $expected;
+            // Same criteria as the deploy gate (attributes, membership, SET ROLE, not owner/platform).
+            $role = app(KekMaintenance::class)->runtimeRole();
+            $ok = KekMaintenance::rlsBound($role);
 
             return [
                 'status' => $ok ? 'ok' : 'fail',
                 'latency_ms' => round((hrtime(true) - $start) / 1e6, 1),
-                'role' => $role->role ?? null,
-                'expected_role' => $role?->role === $expected,
-                'bypass_rls' => (bool) ($role->bypass ?? true),
-                'superuser' => (bool) ($role->super ?? true),
+                'role' => $role['db_user'],
+                'expected_role' => $role['db_user'] === config('database.roles.app'),
+                'bypass_rls' => $role['bypass_rls'] || $role['privileged_member'],
+                'superuser' => $role['superuser'],
             ];
         } catch (Throwable $e) {
             report($e);

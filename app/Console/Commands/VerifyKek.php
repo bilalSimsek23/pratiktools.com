@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Security\Vault\KekMaintenance;
 use Illuminate\Console\Command;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use PDOException;
 use Throwable;
 
@@ -15,8 +16,10 @@ use Throwable;
  *
  * When the check cannot run, it fails (never passes) and prints a safe
  * diagnostic: the stage reached, the exception class and, for database
- * errors, the SQLSTATE, its category and the connection name. Never the
- * exception message, SQL, bindings, host, DSN, user or any secret.
+ * errors, the SQLSTATE, its category, the connection name, for a privilege
+ * error the object it names (identifier only), and the effective database
+ * role (current_user / session_user: role names, not secrets). Never the
+ * exception message, SQL, bindings, host, DSN, password or any secret.
  */
 final class VerifyKek extends Command
 {
@@ -51,7 +54,7 @@ final class VerifyKek extends Command
         try {
             $result = $maintenance->verify(app()->isProduction());
         } catch (Throwable $e) {
-            $this->error('KEK verification could not run: '.self::diagnostic($e, $maintenance->stage).'. Check the database connection and SECRET_VAULT_* settings.');
+            $this->error('KEK verification could not run: '.self::diagnostic($e, $maintenance->stage).self::identity($e).'. Check the database connection and SECRET_VAULT_* settings.');
 
             return self::FAILURE;
         }
@@ -67,6 +70,25 @@ final class VerifyKek extends Command
         $this->info('KEK verification passed.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * For a query error on a working connection: which role the connection
+     * really is. Silent when the connection itself is down.
+     */
+    private static function identity(Throwable $e): string
+    {
+        if (! $e instanceof QueryException || str_starts_with((string) ($e->errorInfo[0] ?? ''), '08')) {
+            return '';
+        }
+        try {
+            $r = DB::connection($e->getConnectionName())->selectOne('SELECT current_user AS u, session_user AS s');
+        } catch (Throwable) {
+            return '';
+        }
+        $name = fn ($v) => preg_replace('/[^A-Za-z0-9_]/', '', (string) $v);
+
+        return ' db_user='.$name($r->u).' session_user='.$name($r->s).' expected_role='.$name(config('database.roles.app'));
     }
 
     /**
@@ -88,6 +110,11 @@ final class VerifyKek extends Command
                     $parts[] = 'reason='.$reason;
                     break;
                 }
+            }
+            // "permission denied for function app_kek_inventory": the object kind and identifier only.
+            if (preg_match('/permission denied for (table|function|schema|sequence|view|relation|database) "?([A-Za-z_][A-Za-z0-9_.]{0,62})"?/', $pdo->getMessage(), $m) === 1) {
+                $parts[] = 'object='.$m[1].':'.$m[2];
+                $parts[] = 'privilege='.($m[1] === 'function' ? 'EXECUTE' : ($m[1] === 'schema' ? 'USAGE' : ($m[1] === 'database' ? 'CONNECT' : 'SELECT')));
             }
             if ($e instanceof QueryException) {
                 $parts[] = 'connection='.preg_replace('/[^a-z0-9_]/i', '', (string) $e->getConnectionName());

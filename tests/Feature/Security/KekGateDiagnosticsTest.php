@@ -3,6 +3,7 @@
 namespace Tests\Feature\Security;
 
 use App\Console\Commands\VerifyKek;
+use App\Security\Vault\KekMaintenance;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -64,7 +65,7 @@ final class KekGateDiagnosticsTest extends TestCase
         [$exit, $output, $original] = $this->gateWith(['port' => 1]);
 
         $this->assertSame(1, $exit);
-        $this->assertStringContainsString('stage=data_key_table_check exception=QueryException sqlstate=08006 category=connection_failure reason=connection_refused connection=pgsql', $output);
+        $this->assertStringContainsString('stage=runtime_role_check exception=QueryException sqlstate=08006 category=connection_failure reason=connection_refused connection=pgsql', $output);
         $this->assertStringNotContainsString('passed', $output);
         $this->assertNoSecrets($output, ['host' => $original['host'], 'username' => $original['username'], 'password' => $original['password']]);
     }
@@ -86,9 +87,92 @@ final class KekGateDiagnosticsTest extends TestCase
 
         $line = VerifyKek::diagnostic($e, 'data_key_samples');
 
-        $this->assertSame('stage=data_key_samples exception=QueryException sqlstate=42501 category=insufficient_privilege reason=permission_denied connection=pgsql', $line);
+        $this->assertSame('stage=data_key_samples exception=QueryException sqlstate=42501 category=insufficient_privilege reason=permission_denied object=function:app_kek_samples privilege=EXECUTE connection=pgsql', $line);
         $this->assertStringNotContainsString('bound-secret-value', $line);
         $this->assertStringNotContainsString('SELECT', $line);
         $this->assertSame('stage=current_kek_self_test exception=RuntimeException', VerifyKek::diagnostic(new \RuntimeException('KEK material abc'), 'current_kek_self_test'));
+    }
+
+    /**
+     * Runs a statement as the owner (it owns the functions), then undoes it.
+     */
+    private function withOwnerChange(string $do, string $undo, \Closure $fn): void
+    {
+        DB::connection('pgsql_owner')->statement($do);
+        try {
+            $fn();
+        } finally {
+            DB::connection('pgsql_owner')->statement($undo);
+        }
+    }
+
+    public function test_missing_inventory_execute_fails_42501_and_names_the_function_and_role(): void
+    {
+        $this->createTenant('alpha');
+        $app = config('database.roles.app');
+        $this->withOwnerChange("REVOKE EXECUTE ON FUNCTION app_kek_inventory() FROM {$app}", "GRANT EXECUTE ON FUNCTION app_kek_inventory() TO {$app}", function () {
+            $this->assertSame(1, Artisan::call('vault:verify-kek'));
+            $output = Artisan::output();
+            $this->assertStringContainsString('stage=data_key_inventory exception=QueryException sqlstate=42501 category=insufficient_privilege reason=permission_denied object=function:app_kek_inventory privilege=EXECUTE connection=pgsql db_user=saas_app session_user=saas_app expected_role=saas_app', $output);
+            $this->assertStringNotContainsString('passed', $output);
+            $this->assertNoSecrets($output, ['password' => config('database.connections.pgsql.password'), 'host' => config('database.connections.pgsql.host')]);
+        });
+        $this->assertSame(0, Artisan::call('vault:verify-kek'), 'Grant restored: passes again.');
+    }
+
+    public function test_a_runtime_connection_that_is_not_the_rls_bound_app_role_fails_before_any_key_is_read(): void
+    {
+        $this->createTenant('alpha');
+        // The owner role (owns every table) as the runtime connection.
+        [$exit, $output] = $this->gateWith(['username' => config('database.connections.pgsql_owner.username'), 'password' => config('database.connections.pgsql_owner.password')]);
+
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('runtime connection is the RLS-bound app role (db_user=saas_owner, bypass_rls=false, superuser=false)', $output);
+        $this->assertStringContainsString('runtime_role_not_rls_bound', $output);
+        $this->assertStringNotContainsString('sample data key', $output, 'Stops before touching data keys.');
+
+        $base = ['db_user' => 'saas_app', 'session_user' => 'saas_app', 'superuser' => false, 'bypass_rls' => false, 'privileged_member' => false];
+        $this->assertTrue(KekMaintenance::rlsBound($base));
+        foreach (['bypass_rls' => true, 'superuser' => true, 'privileged_member' => true, 'session_user' => 'neondb_owner', 'db_user' => 'saas_platform'] as $k => $v) {
+            $this->assertFalse(KekMaintenance::rlsBound([$k => $v] + $base), "{$k} must fail the gate");
+        }
+    }
+
+    public function test_inventory_helpers_return_metadata_only_and_are_closed_to_public(): void
+    {
+        $this->createTenant('alpha');
+        $this->createTenant('beta');
+        $row = (array) DB::selectOne('SELECT * FROM app_kek_inventory()');
+        $this->assertSame(['kek_id', 'data_keys', 'active_keys', 'tenants'], array_keys($row));
+        $this->assertSame(['kek_id', 'tenant_id', 'version'], array_keys((array) DB::selectOne('SELECT * FROM app_kek_samples()')));
+
+        $owner = DB::connection('pgsql_owner');
+        foreach (['app_kek_inventory()', 'app_kek_samples()', 'app_kek_stale_tenants(text)'] as $fn) {
+            $p = $owner->selectOne("SELECT has_function_privilege('public', ?::regprocedure, 'EXECUTE') AS pub, p.prosecdef AS definer, pg_get_userbyid(p.proowner) AS owner,
+                EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, '{}')) c WHERE c LIKE 'search_path=%') AS fixed FROM pg_proc p WHERE p.oid = ?::regprocedure", [$fn, $fn]);
+            $this->assertFalse($p->pub, "{$fn}: PUBLIC must not execute");
+            $this->assertTrue($p->definer && $p->fixed, "{$fn}: definer with a fixed search_path");
+            $this->assertSame(config('database.roles.owner'), $p->owner);
+        }
+        // The runtime role never reads wrapped keys across tenants: no context, no rows; RLS is forced.
+        $this->assertSame(0, DB::table('tenant_data_keys')->count());
+        $this->assertTrue((bool) $owner->selectOne("SELECT relforcerowsecurity AS f FROM pg_class WHERE oid = 'tenant_data_keys'::regclass")->f);
+        $this->assertFalse((bool) $owner->selectOne("SELECT has_table_privilege(?, 'tenant_data_keys', 'DELETE') AS d", [config('database.roles.app')])->d);
+    }
+
+    public function test_db_verify_roles_catches_excessive_grants_and_reports_each_run_on_its_own(): void
+    {
+        $this->assertSame(0, Artisan::call('db:verify-roles'));
+        $platform = config('database.roles.platform');
+        $this->withOwnerChange("GRANT SELECT ON customers TO {$platform}", "REVOKE SELECT ON customers FROM {$platform}", function () {
+            $this->assertSame(1, Artisan::call('db:verify-roles'));
+            $this->assertStringContainsString('readable: customers', Artisan::output());
+        });
+        $this->withOwnerChange('GRANT EXECUTE ON FUNCTION app_kek_samples() TO PUBLIC', 'REVOKE EXECUTE ON FUNCTION app_kek_samples() FROM PUBLIC', function () {
+            $this->assertTrue(DB::connection('pgsql_owner')->selectOne("SELECT has_function_privilege('public', 'app_kek_samples()'::regprocedure, 'EXECUTE') AS p")->p);
+        });
+        // Same process, next run: no failure carried over from the previous one.
+        $this->assertSame(0, Artisan::call('db:verify-roles'), 'Every grant restored.');
+        $this->assertStringNotContainsString('FAIL', Artisan::output());
     }
 }
