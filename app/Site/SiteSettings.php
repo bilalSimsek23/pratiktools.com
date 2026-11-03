@@ -21,7 +21,9 @@ use Illuminate\Support\Facades\DB;
  *
  * Groups:
  *  organization  name, email, phone, address, same_as (profile URLs), kvkk_url
- *  analytics     ga4_id (G-...), google_ads_id (AW-...), google_ads_lead_label, meta_pixel_id (digits)
+ *  analytics     ga4_id (G-...), google_ads_id (AW-...), google_ads_lead_label (primary
+ *                conversion), google_ads_phone_label / google_ads_email_label
+ *                (optional secondary conversions), meta_pixel_id (digits)
  *  crawlers      gptbot: allow|disallow (model training; separate from search)
  *  owner         tenant: slug of the tenant that owns the website
  *  media         disk: a configured filesystem disk for uploaded images
@@ -39,7 +41,7 @@ final class SiteSettings
 {
     private const DEFAULTS = [
         'organization' => ['name' => 'PratikTools', 'email' => '', 'phone' => '', 'address' => '', 'same_as' => [], 'kvkk_url' => ''],
-        'analytics' => ['ga4_id' => '', 'google_ads_id' => '', 'google_ads_lead_label' => '', 'meta_pixel_id' => ''],
+        'analytics' => ['ga4_id' => '', 'google_ads_id' => '', 'google_ads_lead_label' => '', 'google_ads_phone_label' => '', 'google_ads_email_label' => '', 'meta_pixel_id' => ''],
         'crawlers' => ['gptbot' => 'disallow'],
         'owner' => ['tenant' => ''],
         'media' => ['disk' => ''],
@@ -167,6 +169,8 @@ final class SiteSettings
                 'ga4_id' => self::id((string) ($input['ga4_id'] ?? ''), '/^G-[A-Z0-9]{4,16}$/'),
                 'google_ads_id' => self::id((string) ($input['google_ads_id'] ?? ''), '/^AW-[0-9]{6,14}$/'),
                 'google_ads_lead_label' => self::id((string) ($input['google_ads_lead_label'] ?? ''), '/^[A-Za-z0-9_-]{4,64}$/'),
+                'google_ads_phone_label' => self::id((string) ($input['google_ads_phone_label'] ?? ''), '/^[A-Za-z0-9_-]{4,64}$/'),
+                'google_ads_email_label' => self::id((string) ($input['google_ads_email_label'] ?? ''), '/^[A-Za-z0-9_-]{4,64}$/'),
                 'meta_pixel_id' => self::id((string) ($input['meta_pixel_id'] ?? ''), '/^[0-9]{8,20}$/'),
             ],
             'crawlers' => ['gptbot' => ($input['gptbot'] ?? '') === 'allow' ? 'allow' : 'disallow'],

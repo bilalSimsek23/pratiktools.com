@@ -12,8 +12,8 @@
             <ul class="link-list small"><li>Kullandığınız sistemler (ör. Ticimax, Nebim V3, pazaryerleri)</li><li>Çözmek istediğiniz sorun veya otomatikleştirmek istediğiniz iş</li><li>Varsa zaman planınız</li></ul></div>
         @if ($org['email'] || $org['phone'])
             <div class="side-box"><h2 class="side-title">Doğrudan ulaşın</h2>
-                @if ($org['email'])<p><a href="mailto:{{ $org['email'] }}" data-track="contact_click">{{ $org['email'] }}</a></p>@endif
-                @if ($org['phone'])<p><a href="tel:{{ preg_replace('/[^0-9+]/', '', $org['phone']) }}" data-track="contact_click">{{ $org['phone'] }}</a></p>@endif</div>
+                @if ($org['email'])<p><a href="mailto:{{ $org['email'] }}" data-track="email_click">{{ $org['email'] }}</a></p>@endif
+                @if ($org['phone'])<p><a href="tel:{{ preg_replace('/[^0-9+]/', '', $org['phone']) }}" data-track="phone_click">{{ $org['phone'] }}</a></p>@endif</div>
         @endif
         @if ($html !== '')<div class="prose small">{!! $html !!}</div>@endif
     </aside>

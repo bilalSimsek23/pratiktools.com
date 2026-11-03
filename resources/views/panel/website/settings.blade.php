@@ -87,6 +87,9 @@
         <label>Google Analytics 4 (G-…) <input type="text" name="ga4_id" value="{{ $analytics['ga4_id'] }}" @disabled(! $canSettings)></label>
         <label>Google Ads (AW-…) <input type="text" name="google_ads_id" value="{{ $analytics['google_ads_id'] }}" @disabled(! $canSettings)></label>
         <label>Google Ads lead dönüşüm etiketi <input type="text" name="google_ads_lead_label" value="{{ $analytics['google_ads_lead_label'] }}" @disabled(! $canSettings)></label>
+        <label>Google Ads telefon tıklaması etiketi (isteğe bağlı) <input type="text" name="google_ads_phone_label" value="{{ $analytics['google_ads_phone_label'] }}" @disabled(! $canSettings)></label>
+        <label>Google Ads e-posta tıklaması etiketi (isteğe bağlı) <input type="text" name="google_ads_email_label" value="{{ $analytics['google_ads_email_label'] }}" @disabled(! $canSettings)></label>
+        <p class="hint">Etiket, Google Ads'teki dönüşüm işleminin <code>send_to</code> değerinde <code>AW-…/</code> sonrasındaki kısımdır. Lead dönüşümü birincil; telefon ve e-posta tıklamalarını Google Ads'te ikincil dönüşüm olarak tanımlayın.</p>
         <label>Meta Pixel ID <input type="text" name="meta_pixel_id" value="{{ $analytics['meta_pixel_id'] }}" @disabled(! $canSettings)></label>
         <p class="hint">Meta Conversions API (sunucu tarafı) gizli anahtar gerektirir; kasaya (vault) bağlanan ayrı bir adımla eklenecek.</p>
         @if ($canSettings)<div class="actions"><button class="btn" type="submit">Kaydet</button></div>@endif

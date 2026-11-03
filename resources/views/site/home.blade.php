@@ -7,7 +7,7 @@
             <p class="eyebrow">Yazılım · Otomasyon · Yapay Zekâ · Medya Teknolojileri</p>
             <h1>{{ $d['hero_title'] ?? $page['title'] }}</h1>
             <p class="lead">{{ $d['hero_text'] ?? $page['excerpt'] }}</p>
-            <div class="actions"><a class="btn btn-primary" href="/iletisim">Projenizi anlatın</a><a class="btn" href="/hizmetler">Hizmetleri inceleyin</a></div>
+            <div class="actions"><a class="btn btn-primary" href="/iletisim" data-track="cta_click" data-cta="home_hero">Projenizi anlatın</a><a class="btn" href="/hizmetler" data-track="cta_click" data-cta="home_services">Hizmetleri inceleyin</a></div>
         </div>
         <div class="hero-panel" aria-hidden="true">
             <div class="flow"><span>Ticimax</span><i></i><span>Nebim V3</span></div>

@@ -1,7 +1,7 @@
 @extends('panel.layout')
 @section('title', 'SEO ve ölçüm')
 @section('content')
-@php($eventLabels = ['page_view' => 'Sayfa görüntüleme', 'service_view' => 'Hizmet görüntüleme', 'solution_view' => 'Çözüm görüntüleme', 'project_view' => 'Proje görüntüleme', 'article_view' => 'Yazı görüntüleme', 'lead_form_open' => 'Form açma', 'lead_submit' => 'Talep gönderimi', 'contact_click' => 'İletişim tıklaması'])
+@php($eventLabels = ['page_view' => 'Sayfa görüntüleme', 'service_view' => 'Hizmet görüntüleme', 'solution_view' => 'Çözüm görüntüleme', 'project_view' => 'Proje görüntüleme', 'article_view' => 'Yazı görüntüleme', 'lead_form_open' => 'Form açma', 'lead_submit' => 'Talep gönderimi', 'cta_click' => 'CTA tıklaması', 'phone_click' => 'Telefon tıklaması', 'email_click' => 'E-posta tıklaması', 'contact_click' => 'İletişim tıklaması (eski)'])
 <div class="page-head"><div><h1>Web Sitesi · SEO ve ölçüm</h1><p>Site haritası: <a href="/sitemap.xml" target="_blank" rel="noopener">/sitemap.xml</a> · Robots: <a href="/robots.txt" target="_blank" rel="noopener">/robots.txt</a>. Taslak ve arşiv sayfalar site haritasında yer almaz ve açılmaz.</p></div></div>
 <div class="grid g2">
     <div class="card"><h2>Son 30 gün (çerezsiz, kişisel veri içermeyen sayaçlar)</h2>

@@ -39,7 +39,7 @@
             <a href="/blog" @class(['active' => request()->is('blog*')])>Blog</a>
             <a href="/hakkimizda" @class(['active' => request()->is('hakkimizda')])>Hakkımızda</a>
         </nav>
-        <a class="btn btn-primary btn-sm header-cta" href="/iletisim">Projenizi anlatın</a>
+        <a class="btn btn-primary btn-sm header-cta" href="/iletisim" data-track="cta_click" data-cta="header">Projenizi anlatın</a>
     </div>
 </header>
 <main id="main">
@@ -50,8 +50,8 @@
         <div>
             <a class="brand" href="/" aria-label="{{ $brand['name'] }} ana sayfa">@include('site.partials.brand', ['logo' => $brand['footer']['logo']])</a>
             <p class="muted small">Yazılım, otomasyon, yapay zekâ ve medya teknolojileri çözümleri.</p>
-            @if ($org['email'])<p class="small"><a href="mailto:{{ $org['email'] }}" data-track="contact_click">{{ $org['email'] }}</a></p>@endif
-            @if ($org['phone'])<p class="small"><a href="tel:{{ preg_replace('/[^0-9+]/', '', $org['phone']) }}" data-track="contact_click">{{ $org['phone'] }}</a></p>@endif
+            @if ($org['email'])<p class="small"><a href="mailto:{{ $org['email'] }}" data-track="email_click">{{ $org['email'] }}</a></p>@endif
+            @if ($org['phone'])<p class="small"><a href="tel:{{ preg_replace('/[^0-9+]/', '', $org['phone']) }}" data-track="phone_click">{{ $org['phone'] }}</a></p>@endif
         </div>
         <div>
             <h2 class="footer-title">Hizmet alanları</h2>
@@ -69,6 +69,7 @@
     <div class="wrap footer-bottom small muted">
         <span>© {{ date('Y') }} {{ $brand['name'] }}</span>
         <span>Adı geçen ürün ve marka adları sahiplerine aittir; anılmaları iş ortaklığı veya onay anlamına gelmez.</span>
+        @if ($analytics !== [])<button class="link-btn" type="button" data-consent-reset hidden>Çerez tercihleri</button>@endif
     </div>
 </footer>
 @if ($analytics !== [])

@@ -11,7 +11,9 @@ use Illuminate\Support\Facades\DB;
  */
 final class SiteEvents
 {
-    public const EVENTS = ['page_view', 'service_view', 'solution_view', 'project_view', 'article_view', 'lead_form_open', 'lead_submit', 'contact_click'];
+    /** contact_click is kept for the counts recorded before phone_click / email_click. */
+    public const EVENTS = ['page_view', 'service_view', 'solution_view', 'project_view', 'article_view', 'lead_form_open', 'lead_submit',
+        'cta_click', 'phone_click', 'email_click', 'contact_click'];
 
     public static function path(string $path): ?string
     {

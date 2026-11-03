@@ -16,7 +16,7 @@
     @elseif ($type->value === 'project')
         <p class="small muted">{{ $named ? $d['client_name'] : ($d['client_display'] ?? '') }}@if (($d['industry'] ?? '') !== '') · {{ $d['industry'] }}@endif</p>
     @else
-        <div class="actions"><a class="btn btn-primary" href="#talep">{{ ($d['cta_label'] ?? '') !== '' ? $d['cta_label'] : 'Teklif alın' }}</a></div>
+        <div class="actions"><a class="btn btn-primary" href="#talep" data-track="cta_click" data-cta="{{ $type->value }}_hero">{{ ($d['cta_label'] ?? '') !== '' ? $d['cta_label'] : 'Teklif alın' }}</a></div>
     @endif
 </div></section>
 
