@@ -184,6 +184,23 @@ final class InitialContent
     }
 
     /**
+     * The starting definition of a page, service or solution (this class or
+     * the media catalog), to tell untouched content from panel edits.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function starting(string $type, string $slug): ?array
+    {
+        foreach ([...self::pages(), ...self::services(), ...self::solutions(), ...MediaCatalog::services(), ...MediaCatalog::solutions()] as $c) {
+            if ($c['type'] === $type && $c['slug'] === $slug) {
+                return $c;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * The home page when its record is missing (never empty).
      *
      * @return array<string, mixed>

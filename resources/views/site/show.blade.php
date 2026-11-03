@@ -26,6 +26,10 @@
         @foreach ([['problem', 'Problem'], ['challenge', 'Problem'], ['approach', 'Yaklaşımımız'], ['solution_text', 'Çözüm']] as [$k, $h])
             @if (($d[$k] ?? '') !== '')<h2>{{ $h }}</h2><p>{!! nl2br(e($d[$k])) !!}</p>@endif
         @endforeach
+        @if (! empty($d['how_it_works']))
+            <h2>Nasıl çalışıyor?</h2>
+            <ol class="steps">@foreach ($d['how_it_works'] as $s)<li><h3>{{ $s['title'] }}</h3>@if (($s['text'] ?? '') !== '')<p>{{ $s['text'] }}</p>@endif</li>@endforeach</ol>
+        @endif
         @foreach ([['benefits', 'Faydalar'], ['features', $type->value === 'solution' ? 'Neler sunuyoruz' : 'Kapsam'], ['use_cases', 'Örnek kullanım senaryoları'], ['examples', 'Örnekler']] as [$k, $h])
             @if ($list($k) !== [])<h2>{{ $h }}</h2><ul>@foreach ($list($k) as $x)<li>{{ $x }}</li>@endforeach</ul>@endif
         @endforeach
@@ -37,13 +41,21 @@
         @foreach ([['systems', 'Entegre olunan sistemler'], ['technologies', 'Teknolojiler'], ['integrations', 'Entegrasyonlar']] as [$k, $h])
             @if ($list($k) !== [])<div class="side-box"><h2 class="side-title">{{ $h }}</h2><ul class="chips">@foreach ($list($k) as $x)<li>{{ $x }}</li>@endforeach</ul></div>@endif
         @endforeach
-        @php($links = [...$item['related'], ...$item['referenced_by']])
+        @php($allLinks = array_values(array_column(array_merge($item['related'], $item['referenced_by']), null, 'url')))
+        @php($relatedProjects = $type->value === 'project' ? [] : array_values(array_filter($allLinks, fn ($r) => $r['type'] === 'project')))
+        @php($links = array_values(array_filter($allLinks, fn ($r) => ! in_array($r, $relatedProjects, true))))
         @if ($links !== [])
             <div class="side-box"><h2 class="side-title">İlgili içerikler</h2><ul class="link-list">@foreach ($links as $r)<li><a href="{{ $r['url'] }}">{{ $r['title'] }}</a></li>@endforeach</ul></div>
         @endif
     </aside>
 </div>
 </article>
+
+@if ($relatedProjects !== [])
+<section class="section wrap" aria-labelledby="ilgili-projeler"><h2 id="ilgili-projeler">Bu alandaki projelerimiz</h2>
+    <div class="cards">@foreach (array_slice($relatedProjects, 0, 3) as $p)@include('site.partials.card', ['c' => $p + ['category' => null, 'data' => []]])@endforeach</div>
+</section>
+@endif
 
 @if ($otherProjects !== [])
 <section class="section wrap"><h2>Diğer projeler</h2><div class="cards">@foreach ($otherProjects as $c)@include('site.partials.card', ['c' => $c])@endforeach</div></section>

@@ -40,7 +40,7 @@ final class PublicSiteController extends Controller
         return $this->render('site.home', [
             'page' => $page,
             'categories' => array_map(fn ($c) => $c + ['services' => array_values(array_filter($services, fn ($s) => ($s['category']['id'] ?? null) === $c['id']))],
-                $this->site->categories('service')),
+                $this->site->categories('service', withContent: true)),
             'solutions' => $this->site->published(ContentType::Solution, limit: 6),
             'projects' => $this->site->published(ContentType::Project, limit: 6, featuredOnly: true),
             'references' => $this->site->references(featuredOnly: true),
@@ -65,7 +65,7 @@ final class PublicSiteController extends Controller
         $path = '/'.$type->routePrefix();
 
         return $this->render('site.index', ['type' => $type, 'title' => $title, 'intro' => $intro, 'items' => $items, 'category' => $category,
-            'categories' => $type === ContentType::Service ? $this->site->categories('service') : ($type === ContentType::Article ? $this->site->categories('article') : []),
+            'categories' => $type === ContentType::Service || $type === ContentType::Article ? $this->site->categories($type->categoryKind() ?? '', withContent: true) : [],
             'crumbs' => [['Ana Sayfa', '/'], [$title, $path]]],
             // Filtered blog lists are not separate pages for search engines.
             $this->seo->meta($category === null ? $title : $category['name'].' — '.$title, $intro, $path, index: $category === null),
@@ -138,7 +138,7 @@ final class PublicSiteController extends Controller
         return response()->view($view, $data + [
             'meta' => $meta, 'jsonLd' => $schema === [] ? null : SiteSeo::jsonLd($schema), 'event' => $event,
             'org' => $this->settings->get('organization'), 'brand' => $this->brand->view(), 'analytics' => $this->analytics->config(),
-            'serviceCategories' => $this->site->categories('service'), 'formStamp' => SiteInquiries::stamp(),
+            'serviceCategories' => $this->site->categories('service', withContent: true), 'formStamp' => SiteInquiries::stamp(),
             'interests' => $this->inquiries->interests(), 'inquiryAvailable' => $this->inquiries->available(),
         ], $status)->header('Cache-Control', $status === 200 && ($meta['robots'] ?? '') !== '' ? 'public, max-age='.$this->settings->cacheSeconds() : 'no-store')
             ->header('Referrer-Policy', 'strict-origin-when-cross-origin');

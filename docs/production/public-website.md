@@ -95,6 +95,11 @@ utm source/medium/campaign/content/term, landing path (no query string),
 referrer host, presence of gclid/fbclid/msclkid (never the value), and a class:
 `google_ads`, `meta_ads`, `ai_search`, `campaign`, `organic`, `referral`, `direct`.
 
+Check before ads: `php artisan site:lead-check` — the form can store
+inquiries, GA4/Ads ids and the lead label are set, contact details. Prints
+PASS/FAIL/not set only, never an id. New inquiries are read in the panel
+(panel menu "Leadler", `/app/website/leads`); there is no external notice.
+
 ## SEO and AI crawlers
 
 Per page: unique title, meta description, canonical (no query), robots,
@@ -146,9 +151,22 @@ Every change bumps the site cache version.
 
 First-party counters without cookies or personal data (`site_events_daily`):
 page_view, service/solution/project/article_view, lead_form_open, lead_submit
-(server side), contact_click. The same events go to GA4 / Google Ads (lead
-conversion label) / Meta Pixel when configured and consented. Meta Conversions
-API needs a secret (vault) and is not implemented yet.
+(server side), cta_click (`data-track="cta_click" data-cta="<where>"`),
+phone_click and email_click (every `tel:` / `mailto:` link), and the older
+contact_click (counts before the split). The same events go to GA4 / Meta
+Pixel when configured and consented.
+
+Google Ads conversions (site setting `analytics`): lead_submit with the lead
+label is primary and carries the submission id as `transaction_id` (dedupe);
+phone_click / email_click fire a conversion only when their optional labels
+are set (mark them secondary in Google Ads).
+
+Consent: providers load only after "Kabul et". Google gets Consent Mode v2:
+default denied, then `ad_storage`, `ad_user_data`, `analytics_storage`
+granted; `ad_personalization` stays denied (the banner asks for measurement,
+not remarketing). "Çerez tercihleri" in the footer reopens the banner; "Reddet"
+sends a denied update (and Meta `consent revoke`). Meta Conversions API needs
+a secret (vault) and is not implemented yet.
 
 ## Media storage (Laravel Cloud object storage)
 
@@ -216,6 +234,9 @@ passwords are stored only as hashes.
    its disk in Site Ayarları before uploading images.
 4. In Site Ayarları: contact details, KVKK URL, analytics ids, GPTBot policy.
 5. Review the starting content; fill in and publish case studies.
+6. Ads readiness content: `php artisan site:ads-content` (dry run), then
+   `--apply`. See "Ads readiness content" below.
+7. `php artisan site:lead-check`, then one real test inquiry.
 
 ## Media technologies catalog
 
@@ -285,3 +306,29 @@ Installed once by a migration (`InitialContent`, only missing slugs):
 contact), 9 service pages and 4 ad landing pages, and 10 case-study **drafts**
 without client data. The text describes capabilities and approach only — no
 clients, references, success rates or revenue claims.
+
+## Ads readiness content
+
+`site:ads-content` (`AdsContent`; dry run unless `--apply`) writes through the
+audited content service:
+
+- New, published: `/hizmetler/pazaryeri-entegrasyonlari`,
+  `/hizmetler/ozel-yazilim-ve-operasyon-araclari`; case studies
+  `/projeler/ticimax-nebim-cok-kanalli-operasyon`,
+  `/projeler/e-ticaret-operasyon-kontrol-altyapisi`,
+  `/projeler/motioncurate-toplu-video-ve-render-otomasyonu` (featured on home).
+- New drafts (never published by the command): five blog content plans.
+- Corrections and strengthening of existing pages (SEO descriptions, FAQs,
+  "Nasıl çalışıyor" steps, no "Demo" promise, push wording, İYS ViA Frame
+  wording), internal links (added, never removed), and Render Farm in place of
+  E-posta Marketing among the six home solutions.
+
+Panel edits win: a field changes only while it still holds its starting
+value or is empty (key order ignored, data is jsonb); otherwise it is listed as
+`kept`. Existing slugs are never overwritten. Case studies name no client (the
+client is anonymous; MotionCurate is PratikTools' own product) and give no
+unverified figure. Safe to run again.
+
+Public lists show only categories with published content; a service card in
+its category section does not repeat the category name.
+

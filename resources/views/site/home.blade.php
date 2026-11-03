@@ -59,9 +59,11 @@
     <h3 class="sub-head">Seçili çalışmalar</h3>
     <div class="cards">@foreach (array_slice($references, 0, 6) as $ref)@include('site.partials.ref-card', ['ref' => $ref])@endforeach</div>
 </section>
-@elseif ($projects !== [])
+@endif
+
+@if ($projects !== [])
 <section class="section wrap" aria-labelledby="projeler">
-    <div class="section-head"><h2 id="projeler">Seçili projeler</h2><a href="/projeler">Tüm projeler →</a></div>
+    <div class="section-head"><h2 id="projeler">Gerçek projeler, çözdüğümüz problemler</h2><a href="/projeler">Tüm projeler →</a></div>
     <div class="cards">@foreach ($projects as $c)@include('site.partials.card', ['c' => $c])@endforeach</div>
 </section>
 @endif

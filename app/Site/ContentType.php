@@ -72,6 +72,7 @@ enum ContentType: string
             ['key' => 'hero_text', 'label' => 'Hero metni', 'kind' => 'textarea', 'max' => 600],
             ['key' => 'problem', 'label' => 'Problem (hangi sorunu çözüyor)', 'kind' => 'textarea', 'max' => 2000],
             ['key' => 'approach', 'label' => 'Teknik yaklaşım', 'kind' => 'textarea', 'max' => 3000],
+            ['key' => 'how_it_works', 'label' => 'Nasıl çalışıyor (adımlar)', 'kind' => 'steps', 'max' => 400, 'help' => 'Her satır: Adım başlığı | açıklama'],
             ['key' => 'benefits', 'label' => 'Faydalar', 'kind' => 'list', 'max' => 300],
             ['key' => 'features', 'label' => 'Kapsam / özellikler', 'kind' => 'list', 'max' => 300],
             ['key' => 'systems', 'label' => 'Entegre olunan sistemler', 'kind' => 'list', 'max' => 120],

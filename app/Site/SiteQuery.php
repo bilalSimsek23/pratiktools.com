@@ -82,12 +82,17 @@ final class SiteQuery
     }
 
     /**
+     * Active categories; $withContent: only those with published content
+     * (public lists never show an empty category).
+     *
      * @return list<array<string, mixed>>
      */
-    public function categories(string $kind): array
+    public function categories(string $kind, bool $withContent = false): array
     {
-        return $this->cached("cats:{$kind}", fn () => DB::table('site_categories')->where('kind', $kind)->where('active', true)
-            ->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'slug', 'description'])->map(fn ($c) => (array) $c)->all());
+        return $this->cached("cats:{$kind}:".(int) $withContent, fn () => DB::table('site_categories as k')->where('k.kind', $kind)->where('k.active', true)
+            ->when($withContent, fn ($q) => $q->whereExists(fn ($e) => $e->selectRaw('1')->from('site_contents as c')
+                ->whereColumn('c.category_id', 'k.id')->where('c.status', ContentStatus::Published->value)))
+            ->orderBy('k.sort_order')->orderBy('k.name')->get(['k.id', 'k.name', 'k.slug', 'k.description'])->map(fn ($c) => (array) $c)->all());
     }
 
     /**
