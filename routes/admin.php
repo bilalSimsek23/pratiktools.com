@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ActivationController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\ConfirmController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -21,6 +22,11 @@ use Illuminate\Support\Facades\Route;
 Route::name('admin.')->group(function () {
     Route::get('login', [AuthController::class, 'show'])->name('login');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:admin-login')->name('login.attempt');
+
+    // Super Admin activation (platform:admin:invite): signed, single-use link. The
+    // signature is checked in the controller so every bad link answers 410.
+    Route::get('activate/{token}', [ActivationController::class, 'show'])->where('token', '[^/]{1,128}')->middleware('throttle:admin-activation')->name('activate');
+    Route::post('activate/{token}', [ActivationController::class, 'activate'])->where('token', '[^/]{1,128}')->middleware('throttle:admin-activation')->name('activate.attempt');
 
     Route::middleware('auth:platform')->group(function () {
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');

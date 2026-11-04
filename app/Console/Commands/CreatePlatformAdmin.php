@@ -2,6 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Audit\Actor;
+use App\Audit\AuditAction;
+use App\Audit\AuditLogger;
 use App\Models\PlatformAdmin;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
@@ -9,7 +12,9 @@ use Illuminate\Support\Str;
 
 /**
  * Super Admins are created only from the console, through the schema owner
- * connection; the web-facing platform role cannot insert admins.
+ * connection; the web-facing platform role cannot insert admins. Needs an
+ * interactive terminal for the hidden password prompt; without one (Laravel
+ * Cloud Commands) use platform:admin:invite.
  */
 final class CreatePlatformAdmin extends Command
 {
@@ -17,7 +22,7 @@ final class CreatePlatformAdmin extends Command
 
     protected $description = 'Create a Super Admin (two-factor setup is enforced at first login)';
 
-    public function handle(): int
+    public function handle(AuditLogger $audit): int
     {
         $password = (string) $this->secret('Password (min 16 characters)');
 
@@ -34,6 +39,7 @@ final class CreatePlatformAdmin extends Command
 
         $admin = new PlatformAdmin(['name' => (string) $this->argument('name'), 'email' => Str::lower((string) $this->argument('email')), 'password' => $password, 'status' => 'active']);
         $admin->setConnection('pgsql_owner')->save();
+        $audit->record(AuditAction::PlatformAdminCreated, 'platform_admin', $admin->id, [], Actor::console($this->getName()), tenantId: false, connection: 'pgsql_platform');
 
         $this->info("Super Admin {$admin->email} created. Two-factor setup is required at first login.");
 

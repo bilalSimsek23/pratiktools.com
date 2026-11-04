@@ -15,17 +15,23 @@ use Illuminate\Support\Carbon;
  * @property string $email
  * @property ?string $two_factor_secret
  * @property ?Carbon $two_factor_confirmed_at
- * @property string $status
+ * @property string $status active | invited (activation link pending) | disabled
+ * @property ?string $activation_token_hash
+ * @property ?Carbon $activation_expires_at
  */
 class PlatformAdmin extends Authenticatable
 {
     use HasUuids;
 
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_INVITED = 'invited';
+
     protected $connection = 'pgsql_platform';
 
     protected $fillable = ['name', 'email', 'password', 'status'];
 
-    protected $hidden = ['password', 'remember_token', 'two_factor_secret'];
+    protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'activation_token_hash'];
 
     protected function casts(): array
     {
@@ -34,6 +40,7 @@ class PlatformAdmin extends Authenticatable
             'two_factor_secret' => 'encrypted',
             'two_factor_confirmed_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'activation_expires_at' => 'datetime',
         ];
     }
 

@@ -122,6 +122,9 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(20)->by('admin-ip:'.$request->ip()),
         ]);
 
+        // Super Admin activation links: per IP, both opening and submitting.
+        RateLimiter::for('admin-activation', fn (Request $request) => Limit::perMinute(10)->by('admin-activation:'.$request->ip()));
+
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(240)->by(
             'token:'.($request->user()?->currentAccessToken()?->getKey() ?? $request->ip())
         ));

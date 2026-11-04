@@ -14,7 +14,8 @@ use Throwable;
  * - every tenant table forces row-level security, and the runtime role
  *   sees no tenant rows without a tenant context;
  * - the platform (Super Admin) role cannot read tenant personal data, and
- *   runs no SECURITY DEFINER function beyond the member directory.
+ *   runs no SECURITY DEFINER function beyond the member directory and
+ *   Super Admin activation.
  *
  * Prints only role names, counts and pass/fail. Exit code 1 on any failure.
  */
@@ -35,11 +36,12 @@ final class VerifyDatabaseRoles extends Command
 
     /**
      * The only SECURITY DEFINER functions the platform role may execute: the
-     * data key inventory (counts per KEK, no key material) and the member
+     * data key inventory (counts per KEK, no key material), the member
      * directory of Müşteriler (names and e-mail addresses of tenant members,
-     * nothing else personal).
+     * nothing else personal) and Super Admin activation (one invited,
+     * unexpired account per single-use token).
      */
-    public const PLATFORM_FUNCTIONS = ['app_kek_inventory', 'app_platform_tenant_members', 'app_platform_tenant_owners'];
+    public const PLATFORM_FUNCTIONS = ['app_kek_inventory', 'app_platform_tenant_members', 'app_platform_tenant_owners', 'app_platform_admin_activate'];
 
     /** Platform-only tables: the runtime (tenant) role must have no privilege at all. */
     public const PLATFORM_ONLY_TABLES = ['platform_tenant_notes'];

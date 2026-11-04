@@ -35,6 +35,9 @@ enum AuditAction: string
     case PlatformLoginFailed = 'platform.login_failed';
     case PlatformLogout = 'platform.logout';
     case PlatformTwoFactorEnabled = 'platform.two_factor_enabled';
+    case PlatformAdminCreated = 'platform.admin.created';
+    case PlatformAdminInvited = 'platform.admin.invited';
+    case PlatformAdminActivated = 'platform.admin.activated';
     case BreakGlassGranted = 'platform.break_glass_granted';
     case SuppressionCreated = 'consent.suppression_created';
     case SuppressionLifted = 'consent.suppression_lifted';

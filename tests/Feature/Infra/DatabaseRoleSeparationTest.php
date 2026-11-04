@@ -95,8 +95,9 @@ final class DatabaseRoleSeparationTest extends TestCase
 
         sort($offenders);
         // Operator commands only: the read-only verifier, the Super Admin
-        // account bootstrap (the platform role cannot insert admins), and the
-        // guard, which only reads configuration. No HTTP or queue code.
-        $this->assertSame(['Console/Commands/CreatePlatformAdmin.php', 'Console/Commands/VerifyDatabaseRoles.php', 'Support/ProductionGuard.php'], $offenders);
+        // account bootstrap and invitation (the platform role cannot insert
+        // admins), and the guard, which only reads configuration. No HTTP or
+        // queue code.
+        $this->assertSame(['Console/Commands/CreatePlatformAdmin.php', 'Console/Commands/InvitePlatformAdmin.php', 'Console/Commands/VerifyDatabaseRoles.php', 'Support/ProductionGuard.php'], $offenders);
     }
 }

@@ -109,7 +109,41 @@ policies.
 ## Production
 
 1. Deploy runs `migrate --database=pgsql_owner --force --isolated`
-   (`2026_11_08_000001_create_platform_tenant_management`).
+   (`2026_11_08_000001_create_platform_tenant_management`,
+   `2026_11_09_000001_add_platform_admin_activation`).
 2. `ADMIN_DOMAIN` must point at the app with its own hostname.
-3. First Super Admin: `php artisan platform:admin:create <email> "<name>"`, then TOTP setup at first login.
+3. First Super Admin (Laravel Cloud Commands, no interactive terminal):
+   `php artisan platform:admin:invite <email> "<name>"` — see below. With an
+   interactive terminal `platform:admin:create <email> "<name>"` (hidden
+   password prompt) also works.
 4. `php artisan db:verify-roles` must pass.
+
+## Super Admin activation links
+
+`platform:admin:invite {email} {name} {--ttl=30}` (5–120 minutes):
+
+- Creates the admin as `invited` with an unusable password (owner
+  connection), or — for an account that is still `invited` — issues a new
+  link; the previous link stops working. An `active` or `disabled` account
+  is refused.
+- Prints the link once: `https://ADMIN_DOMAIN/activate/<token>?expires=…&signature=…`.
+  The token is 64 random characters; only its SHA-256 is stored
+  (`platform_admins.activation_token_hash`, with `activation_expires_at`).
+  Audit `platform.admin.invited` records only `reissued` and the TTL.
+- The link opens a form on the admin host where the admin chooses a
+  password (≥ 16 characters, confirmed). The password is hashed in PHP and
+  stored by `app_platform_admin_activate(token_hash, password_hash)`:
+  SECURITY DEFINER owned by `saas_owner`, `search_path = pg_catalog, public`,
+  EXECUTE for the platform role only. It changes only an `invited`,
+  unexpired row with that token, accepts only a bcrypt/argon2 hash, sets
+  `active` and clears the token. The platform role still has no UPDATE on
+  `password` or `status`.
+- Then the admin is signed in (`platform.admin.activated`,
+  `platform.login` via activation) and sent to two-factor setup; no Super
+  Admin page opens before it is completed (`EnsurePlatformTwoFactor`).
+- A bad signature and an invalid, used, replaced or expired token all get
+  the same 410 page. Opening and submitting are rate limited per IP
+  (`admin-activation`, 10/min). An `invited` account cannot sign in.
+- The link appears in the command output (Cloud keeps command history):
+  open it right away; once used or expired it is worthless.
+- `platform:admin:create` records `platform.admin.created`.
