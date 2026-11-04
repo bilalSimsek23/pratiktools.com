@@ -15,6 +15,18 @@ return [
     'admin_domain' => env('ADMIN_DOMAIN', 'admin.saas.localhost'),
 
     /*
+    | Tenant invitations (account activation). Links are single use and
+    | expire; only a hash is stored. Until transactional e-mail exists the
+    | Super Admin hands the link over (shown once after creation).
+    */
+    'invitations' => [
+        'ttl_hours' => (int) env('PLATFORM_INVITATION_TTL_HOURS', 72),
+    ],
+
+    // Super Admin password re-confirmation for tenant changes (seconds).
+    'reauth_seconds' => (int) env('PLATFORM_REAUTH_SECONDS', 900),
+
+    /*
     |--------------------------------------------------------------------------
     | Outbound network
     |--------------------------------------------------------------------------

@@ -28,7 +28,7 @@ trait InteractsWithTenants
         $tenant = app(TenantProvisioner::class)->provision(
             ['name' => Str::title($slug), 'slug' => $slug, 'country' => 'TR', 'timezone' => 'Europe/Istanbul', 'currency' => 'TRY', 'locale' => 'tr'],
             ['email' => "owner@{$slug}.test", 'name' => "Owner {$slug}", 'password' => self::PASSWORD],
-        );
+        )->tenant;
 
         return [$tenant, User::query()->where('email', "owner@{$slug}.test")->firstOrFail()];
     }

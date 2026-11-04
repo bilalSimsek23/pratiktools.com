@@ -1,0 +1,1 @@
+<span class="badge {{ ['ready' => 'b-ok', 'configured' => '', 'waiting' => 'b-warn', 'blocked' => 'b-bad', 'not_configured' => 'b-muted'][$state] ?? 'b-muted' }}">{{ \App\Tenancy\TenantOnboarding::LABELS[$state] ?? $state }}</span>

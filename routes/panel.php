@@ -5,6 +5,7 @@ use App\Http\Controllers\Panel\CampaignController;
 use App\Http\Controllers\Panel\ContentController;
 use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Panel\DispatchController;
+use App\Http\Controllers\Panel\InvitationController;
 use App\Http\Controllers\Panel\LeadFormController;
 use App\Http\Controllers\Panel\OperationsController;
 use App\Http\Controllers\Panel\ReconciliationController;
@@ -25,6 +26,9 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('login', [AuthController::class, 'show'])->name('login');
+// Account activation / tenant invitation: signed link, single-use token.
+Route::get('davet/{token}', [InvitationController::class, 'show'])->where('token', '[A-Za-z0-9]{64}')->middleware('signed:relative')->name('invitation');
+Route::post('davet/{token}', [InvitationController::class, 'accept'])->where('token', '[A-Za-z0-9]{64}')->middleware(['signed:relative', 'throttle:login'])->name('invitation.accept');
 Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login')->name('login.attempt');
 
 Route::middleware('auth:web')->group(function () {

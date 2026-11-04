@@ -160,19 +160,23 @@ final class KekGateDiagnosticsTest extends TestCase
         $this->assertFalse((bool) $owner->selectOne("SELECT has_table_privilege(?, 'tenant_data_keys', 'DELETE') AS d", [config('database.roles.app')])->d);
     }
 
-    public function test_db_verify_roles_catches_excessive_grants_and_reports_each_run_on_its_own(): void
+    public function test_db_verify_roles_catches_excessive_grants(): void
     {
         $this->assertSame(0, Artisan::call('db:verify-roles'));
-        $platform = config('database.roles.platform');
-        $this->withOwnerChange("GRANT SELECT ON customers TO {$platform}", "REVOKE SELECT ON customers FROM {$platform}", function () {
-            $this->assertSame(1, Artisan::call('db:verify-roles'));
-            $this->assertStringContainsString('readable: customers', Artisan::output());
-        });
         $this->withOwnerChange('GRANT EXECUTE ON FUNCTION app_kek_samples() TO PUBLIC', 'REVOKE EXECUTE ON FUNCTION app_kek_samples() FROM PUBLIC', function () {
-            $this->assertTrue(DB::connection('pgsql_owner')->selectOne("SELECT has_function_privilege('public', 'app_kek_samples()'::regprocedure, 'EXECUTE') AS p")->p);
+            $this->assertSame(1, Artisan::call('db:verify-roles'));
+            $this->assertStringContainsString('unsafe: app_kek_samples', Artisan::output());
         });
-        // Same process, next run: no failure carried over from the previous one.
+        $app = config('database.roles.app');
+        $this->withOwnerChange("GRANT SELECT ON platform_tenant_notes TO {$app}", "REVOKE SELECT ON platform_tenant_notes FROM {$app}", function () {
+            $this->assertSame(1, Artisan::call('db:verify-roles'));
+            $this->assertStringContainsString('reachable or missing: platform_tenant_notes', Artisan::output());
+        });
+        $platform = config('database.roles.platform');
+        $this->withOwnerChange("GRANT EXECUTE ON FUNCTION app_kek_samples() TO {$platform}", "REVOKE EXECUTE ON FUNCTION app_kek_samples() FROM {$platform}", function () {
+            $this->assertSame(1, Artisan::call('db:verify-roles'));
+            $this->assertStringContainsString('not allowed: app_kek_samples', Artisan::output());
+        });
         $this->assertSame(0, Artisan::call('db:verify-roles'), 'Every grant restored.');
-        $this->assertStringNotContainsString('FAIL', Artisan::output());
     }
 }

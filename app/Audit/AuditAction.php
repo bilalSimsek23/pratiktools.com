@@ -5,6 +5,16 @@ namespace App\Audit;
 enum AuditAction: string
 {
     case TenantCreated = 'tenant.created';
+    case TenantSuspended = 'tenant.suspended';
+    case TenantReactivated = 'tenant.reactivated';
+    case TenantOwnerInvited = 'tenant.owner.invited';
+    case TenantUserInvited = 'tenant.user.invited';
+    case TenantInvitationAccepted = 'tenant.invitation.accepted';
+    case TenantMembershipDisabled = 'tenant.membership.disabled';
+    case TenantMembershipEnabled = 'tenant.membership.enabled';
+    case TenantRoleChanged = 'tenant.role.changed';
+    case PlatformReauthenticated = 'platform.reauthenticated';
+    case PlatformTenantNoteChanged = 'platform.tenant_note.changed';
     case TenantSettingsUpdated = 'tenant.settings_updated';
     case MemberRoleChanged = 'member.role_changed';
     case MemberAdded = 'member.added';

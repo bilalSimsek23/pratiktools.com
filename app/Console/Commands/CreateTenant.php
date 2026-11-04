@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Audit\Actor;
+use App\Tenancy\ProvisioningError;
 use App\Tenancy\TenantProvisioner;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
@@ -14,9 +15,11 @@ final class CreateTenant extends Command
         {slug : URL-safe identifier}
         {--owner-email= : Owner e-mail (created if missing)}
         {--owner-name= : Owner name}
-        {--country=TR} {--timezone=Europe/Istanbul} {--currency=TRY} {--locale=tr}';
+        {--country=TR} {--timezone=Europe/Istanbul} {--currency=TRY} {--locale=tr}
+        {--invite : Do not ask for a password; the owner activates the account through an invitation link}
+        {--show-invite-link : Print the one-time invitation link (otherwise create a new one in Platform Yönetimi)}';
 
-    protected $description = 'Provision a tenant with its settings, owner and data key';
+    protected $description = 'Provision a tenant with its settings, owner and data key (same service as Platform Yönetimi › Yeni Müşteri)';
 
     public function handle(TenantProvisioner $provisioner): int
     {
@@ -33,7 +36,7 @@ final class CreateTenant extends Command
 
         $validator = Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'regex:/^[a-z0-9][a-z0-9-]{1,62}$/'],
+            'slug' => ['required', 'regex:'.TenantProvisioner::SLUG_PATTERN],
             'country' => ['required', 'size:2', 'alpha'],
             'timezone' => ['required', 'timezone:all'],
             'currency' => ['required', 'size:3', 'alpha'],
@@ -48,15 +51,37 @@ final class CreateTenant extends Command
             return self::FAILURE;
         }
 
-        $password = $this->secret('Owner password (leave empty to keep an existing user\'s password or set a random one)');
+        $password = $this->option('invite') ? null : $this->secret('Owner password (empty: invite the owner to set their own password)');
+        if (is_string($password) && $password !== '' && strlen($password) < 12) {
+            $this->error('Password must be at least 12 characters.');
 
-        $tenant = $provisioner->provision(
-            ['name' => $input['name'], 'slug' => $input['slug'], 'country' => $input['country'], 'timezone' => $input['timezone'], 'currency' => $input['currency'], 'locale' => $input['locale']],
-            ['email' => $input['owner_email'], 'name' => $input['owner_name'], 'password' => $password ?: null],
-            Actor::console($this->getName()),
-        );
+            return self::FAILURE;
+        }
 
-        $this->info("Tenant {$tenant->slug} created ({$tenant->id}).");
+        try {
+            $result = $provisioner->provision(
+                ['name' => $input['name'], 'slug' => $input['slug'], 'country' => $input['country'], 'timezone' => $input['timezone'], 'currency' => $input['currency'], 'locale' => $input['locale']],
+                ['email' => $input['owner_email'], 'name' => $input['owner_name'], 'password' => $password ?: null],
+                Actor::console($this->getName()),
+            );
+        } catch (ProvisioningError $e) {
+            $this->error($e->getMessage());
+
+            return self::FAILURE;
+        }
+
+        if (! $result->created) {
+            $this->info("Tenant {$result->tenant->slug} already exists for this owner; nothing changed.");
+
+            return self::SUCCESS;
+        }
+        $this->info("Tenant {$result->tenant->slug} created ({$result->tenant->id}).");
+        if ($result->invitation !== null) {
+            $this->line('Owner invitation created (expires '.$result->invitation->expiresAt->toDateTimeString().').');
+            $this->option('show-invite-link')
+                ? $this->line($result->invitation->url)
+                : $this->line('Link not printed. Show it with --show-invite-link, or create a new link in Platform Yönetimi › Müşteriler.');
+        }
 
         return self::SUCCESS;
     }

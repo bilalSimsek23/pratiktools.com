@@ -20,7 +20,20 @@
     @if ($panelCan(\App\Tenancy\Permission::CampaignsManage))<div class="actions"><a class="btn btn-primary" href="{{ route('panel.campaigns.create') }}">+ Yeni kampanya</a></div>@endif
 </div>
 
-<div class="grid g4">
+@php($onboardingReady = \App\Tenancy\TenantOnboarding::readyCount($onboarding))
+@if ($onboardingReady < count($onboarding))
+<div class="card">
+    <h2>Başlangıç / Kurulum Durumu <span class="badge b-warn">{{ $onboardingReady }}/{{ count($onboarding) }} hazır</span></h2>
+    <ol class="list-plain small">
+        @foreach (array_values($onboarding) as $i => $step)
+            <li class="split"><span>{{ $i + 1 }}/{{ count($onboarding) }} {{ $step['label'] }}</span>
+                <span class="badge {{ $step['state'] === 'ready' ? 'b-pass' : ($step['state'] === 'blocked' ? 'b-bad' : 'b-warn') }}">{{ $step['state_label'] }}</span></li>
+        @endforeach
+    </ol>
+    <p class="hint">Entegrasyonlar bağlanıp doğrulanana kadar ilgili gönderim ve senkronlar çalışmaz.</p>
+</div>
+@endif
+<div @class(["grid g4", "stack-top" => $onboardingReady < count($onboarding)])>
     <div class="card kpi"><div class="label">Kampanyalar</div><div class="value">{{ $campaigns['active'] }}</div>
         <div class="sub">{{ $campaigns['draft'] }} taslak · {{ $campaigns['ready'] }} hazır · {{ $campaigns['scheduled'] }} planlı</div>
         @if ($campaigns['blocked'] > 0)<div class="sub"><span class="badge b-bad">{{ $campaigns['blocked'] }} harici engelde</span></div>@endif</div>

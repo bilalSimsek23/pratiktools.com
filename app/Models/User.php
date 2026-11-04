@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -16,6 +17,8 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string $id
  * @property string $name
  * @property string $email
+ * @property Carbon|null $activated_at
+ * @property Carbon|null $email_verified_at
  */
 class User extends Authenticatable
 {
@@ -30,6 +33,8 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            // Null until an invited account sets its own password.
+            'activated_at' => 'datetime',
             'password' => 'hashed',
         ];
     }

@@ -8,6 +8,7 @@ use App\Notifications\TenantNotifications;
 use App\Operations\MarketingDashboard;
 use App\Tenancy\Permission;
 use App\Tenancy\TenantContext;
+use App\Tenancy\TenantOnboarding;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -26,6 +27,8 @@ final class DashboardController extends Controller
             'waitingRuns' => DB::table('automation_runs')->where('tenant_id', $tenantId)->where('status', 'waiting')->count(),
             'notifications' => $notifications->forMember($this->userId(), $this->role(), unreadOnly: true, limit: 8),
             'canApprove' => $this->can(Permission::CampaignsApprove),
+            // Setup status from stored integration rows only (never a secret).
+            'onboarding' => TenantOnboarding::summarize(DB::table('tenant_integrations')->where('tenant_id', $tenantId)->get(['provider', 'status'])),
         ]);
     }
 }

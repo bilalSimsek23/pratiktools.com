@@ -1,10 +1,15 @@
 <?php
 
 use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\ConfirmController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\RequestDiagnosticsController;
+use App\Http\Controllers\Admin\SystemController;
+use App\Http\Controllers\Admin\TenantController;
+use App\Http\Controllers\Admin\TenantMemberController;
 use App\Http\Controllers\Admin\TwoFactorController;
 use App\Http\Middleware\EnsurePlatformTwoFactor;
+use App\Http\Middleware\PlatformRecentAuth;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,6 +33,23 @@ Route::name('admin.')->group(function () {
         Route::middleware(EnsurePlatformTwoFactor::class)->group(function () {
             Route::get('/', DashboardController::class)->name('dashboard');
             Route::get('diagnostics/request', RequestDiagnosticsController::class)->name('diagnostics.request');
+            Route::get('system', SystemController::class)->name('system');
+            Route::get('confirm', [ConfirmController::class, 'show'])->name('confirm');
+            Route::post('confirm', [ConfirmController::class, 'confirm'])->middleware('throttle:admin-login')->name('confirm.attempt');
+
+            // Müşteriler (tenants). Every change needs a recent password confirmation.
+            Route::get('tenants', [TenantController::class, 'index'])->name('tenants');
+            Route::get('tenants/new', [TenantController::class, 'create'])->name('tenants.create');
+            Route::get('tenants/{tenant}', [TenantController::class, 'show'])->whereUuid('tenant')->name('tenants.show');
+            Route::middleware(PlatformRecentAuth::class)->group(function () {
+                Route::post('tenants', [TenantController::class, 'store'])->middleware('throttle:20,1')->name('tenants.store');
+                Route::post('tenants/{tenant}/status', [TenantController::class, 'status'])->whereUuid('tenant')->name('tenants.status');
+                Route::post('tenants/{tenant}/note', [TenantController::class, 'note'])->whereUuid('tenant')->name('tenants.note');
+                Route::post('tenants/{tenant}/members', [TenantMemberController::class, 'store'])->whereUuid('tenant')->middleware('throttle:30,1')->name('tenants.members.store');
+                Route::post('tenants/{tenant}/members/{member}/role', [TenantMemberController::class, 'role'])->whereUuid(['tenant', 'member'])->name('tenants.members.role');
+                Route::post('tenants/{tenant}/members/{member}/status', [TenantMemberController::class, 'status'])->whereUuid(['tenant', 'member'])->name('tenants.members.status');
+                Route::post('tenants/{tenant}/members/{member}/invitation', [TenantMemberController::class, 'reissue'])->whereUuid(['tenant', 'member'])->middleware('throttle:30,1')->name('tenants.members.invitation');
+            });
         });
     });
 });

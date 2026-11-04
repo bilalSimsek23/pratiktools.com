@@ -34,7 +34,7 @@ final class PlatformAdminTest extends TestCase
         $this->post("{$this->host}/two-factor/setup", ['code' => app(Google2FA::class)->getCurrentOtp($secret)])
             ->assertRedirect(route('admin.dashboard'));
 
-        $this->get("{$this->host}/")->assertOk()->assertSee('Tenants');
+        $this->get("{$this->host}/")->assertOk()->assertSee('Genel Bakış');
         $this->assertNotNull($admin->refresh()->two_factor_confirmed_at);
     }
 

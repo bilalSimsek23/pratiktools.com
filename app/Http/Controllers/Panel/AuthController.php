@@ -31,7 +31,8 @@ final class AuthController extends Controller
     public function login(Request $request): RedirectResponse
     {
         $data = $request->validate(['email' => ['required', 'string', 'email', 'max:255'], 'password' => ['required', 'string', 'max:255']]);
-        if (! Auth::guard('web')->attempt(['email' => Str::lower($data['email']), 'password' => $data['password']])) {
+        // An invited account that has not set its own password cannot sign in.
+        if (! Auth::guard('web')->attempt(['email' => Str::lower($data['email']), 'password' => $data['password'], fn ($q) => $q->whereNotNull('activated_at')])) {
             $this->audit->record(AuditAction::PanelLoginFailed, actor: Actor::system(), tenantId: false);
 
             throw ValidationException::withMessages(['email' => __('auth.failed')]);
@@ -40,6 +41,11 @@ final class AuthController extends Controller
         $request->session()->put(PanelRecentAuth::SESSION_KEY, time());
         $this->audit->record(AuditAction::PanelLogin, 'user', (string) Auth::guard('web')->id(), [], Actor::user((string) Auth::guard('web')->id()), tenantId: false);
 
+        // Signing in to accept an invitation: back to the link.
+        $invitation = $request->session()->pull('panel.invitation');
+        if (is_string($invitation) && parse_url($invitation, PHP_URL_HOST) === $request->getHost() && str_starts_with((string) parse_url($invitation, PHP_URL_PATH), '/app/davet/')) {
+            return redirect()->to($invitation);
+        }
         $tenants = $this->memberships();
 
         return count($tenants) === 1 ? $this->enter($request, $tenants[0]->tenant_id) : redirect()->route('panel.tenants');

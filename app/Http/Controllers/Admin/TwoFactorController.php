@@ -7,6 +7,7 @@ use App\Audit\AuditAction;
 use App\Audit\AuditLogger;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsurePlatformTwoFactor;
+use App\Http\Middleware\PlatformRecentAuth;
 use App\Models\PlatformAdmin;
 use App\Platform\TwoFactor;
 use Illuminate\Http\RedirectResponse;
@@ -54,6 +55,7 @@ final class TwoFactorController extends Controller
         $admin->forceFill(['two_factor_secret' => $secret, 'two_factor_confirmed_at' => now()])->save();
         $request->session()->forget(self::PENDING_SECRET);
         $request->session()->put(EnsurePlatformTwoFactor::SESSION_KEY, $admin->id);
+        $request->session()->put(PlatformRecentAuth::SESSION_KEY, time());
         $request->session()->regenerate();
 
         $this->audit->record(AuditAction::PlatformTwoFactorEnabled, 'platform_admin', $admin->id, [], Actor::platformAdmin($admin->id), tenantId: false, connection: 'pgsql_platform');
@@ -77,6 +79,7 @@ final class TwoFactorController extends Controller
 
         $request->session()->regenerate();
         $request->session()->put(EnsurePlatformTwoFactor::SESSION_KEY, $admin->id);
+        $request->session()->put(PlatformRecentAuth::SESSION_KEY, time());
 
         return redirect()->route('admin.dashboard');
     }

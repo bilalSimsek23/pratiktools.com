@@ -13,7 +13,8 @@ use Throwable;
  * - the owner owns every table; the runtime roles cannot create objects;
  * - every tenant table forces row-level security, and the runtime role
  *   sees no tenant rows without a tenant context;
- * - the platform (Super Admin) role cannot read tenant personal data.
+ * - the platform (Super Admin) role cannot read tenant personal data, and
+ *   runs no SECURITY DEFINER function beyond the member directory.
  *
  * Prints only role names, counts and pass/fail. Exit code 1 on any failure.
  */
@@ -32,6 +33,17 @@ final class VerifyDatabaseRoles extends Command
         'campaign_approvals', 'tenant_notifications', 'via_consent_requests', 'iys_reconciliation_batches', 'iys_consent_changes', 'lead_inquiries',
     ];
 
+    /**
+     * The only SECURITY DEFINER functions the platform role may execute: the
+     * data key inventory (counts per KEK, no key material) and the member
+     * directory of Müşteriler (names and e-mail addresses of tenant members,
+     * nothing else personal).
+     */
+    public const PLATFORM_FUNCTIONS = ['app_kek_inventory', 'app_platform_tenant_members', 'app_platform_tenant_owners'];
+
+    /** Platform-only tables: the runtime (tenant) role must have no privilege at all. */
+    public const PLATFORM_ONLY_TABLES = ['platform_tenant_notes'];
+
     /** Tables the platform role may read metadata of, but never these columns. */
     public const PII_COLUMNS = [
         'webhook_inbox' => ['payload', 'headers_minimized'],
@@ -40,6 +52,8 @@ final class VerifyDatabaseRoles extends Command
         'audit_logs' => ['ip_hash', 'user_agent_hash'],
         // Platform sees dispatch counts only, never recipients or content.
         'campaign_dispatches' => ['recipients', 'content', 'plan', 'requested_by', 'cancelled_by', 'block_reason'],
+        // Platform sees invitation state only, never the token hash or who it is for.
+        'user_invitations' => ['token_hash', 'user_id', 'created_by'],
     ];
 
     /**
@@ -129,6 +143,39 @@ final class VerifyDatabaseRoles extends Command
             }
 
             return [$readable === [], $readable === [] ? count(self::PII_TABLES).' tables, '.count(self::PII_COLUMNS).' metadata-only tables checked' : 'readable: '.implode(', ', $readable)];
+        });
+
+        $this->check('platform role runs only the allowlisted definer functions', function () use ($roles) {
+            $names = array_column(DB::connection('pgsql_owner')->select(
+                "SELECT p.proname FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace
+                 WHERE ns.nspname = 'public' AND p.prosecdef AND has_function_privilege(?, p.oid, 'EXECUTE')", [$roles['platform']]), 'proname');
+            $extra = array_values(array_diff($names, self::PLATFORM_FUNCTIONS));
+
+            return [$extra === [], $extra === [] ? implode(', ', $names) ?: 'none' : 'not allowed: '.implode(', ', $extra)];
+        });
+
+        $this->check('runtime role has no access to platform-only tables', function () use ($roles) {
+            $reachable = [];
+            foreach (self::PLATFORM_ONLY_TABLES as $t) {
+                $r = DB::connection('pgsql_owner')->selectOne(
+                    "SELECT to_regclass(?) IS NULL OR has_table_privilege(?, to_regclass(?), 'SELECT,INSERT,UPDATE,DELETE') OR has_any_column_privilege(?, to_regclass(?), 'SELECT') AS r",
+                    ["public.{$t}", $roles['app'], "public.{$t}", $roles['app'], "public.{$t}"]);
+                if ($r->r) {
+                    $reachable[] = $t;
+                }
+            }
+
+            return [$reachable === [], $reachable === [] ? implode(', ', self::PLATFORM_ONLY_TABLES) : 'reachable or missing: '.implode(', ', $reachable)];
+        });
+
+        $this->check('definer functions: fixed search_path, no PUBLIC execute', function () {
+            $bad = DB::connection('pgsql_owner')->select(
+                "SELECT p.proname FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace
+                 WHERE ns.nspname = 'public' AND p.prosecdef
+                   AND (NOT EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, '{}')) c WHERE c LIKE 'search_path=%')
+                        OR has_function_privilege('public', p.oid, 'EXECUTE'))");
+
+            return [$bad === [], $bad === [] ? 'all definer functions' : 'unsafe: '.implode(', ', array_column($bad, 'proname'))];
         });
 
         $this->table(['check', 'result', 'detail'], $this->rows);

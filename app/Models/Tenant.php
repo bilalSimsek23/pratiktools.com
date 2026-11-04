@@ -30,7 +30,7 @@ class Tenant extends Model
 
     public const STATUS_SUSPENDED = 'suspended';
 
-    protected $fillable = ['id', 'public_id', 'name', 'slug', 'status', 'country', 'timezone', 'currency', 'locale'];
+    protected $fillable = ['id', 'public_id', 'name', 'slug', 'status', 'country', 'timezone', 'currency', 'locale', 'contact_phone', 'plan', 'suspended_at', 'suspension_reason'];
 
     /**
      * @return HasOne<TenantSetting, $this>
