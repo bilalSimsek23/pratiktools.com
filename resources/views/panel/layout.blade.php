@@ -156,6 +156,9 @@
         <a href="{{ route('panel.integrations') }}" @class(['active' => $route === 'panel.integrations'])>Entegrasyonlar</a>
         @endif
         <a href="{{ route('panel.settings') }}" @class(['active' => $route === 'panel.settings'])>Ayarlar</a>
+        @if (isset($panelCan) && $panelCan(\App\Tenancy\Permission::MembersView))
+        <a href="{{ route('panel.team') }}" @class(['active' => $route === 'panel.team'])>Ekip</a>
+        @endif
         @if (($panelSiteOwner ?? false) && isset($panelCan) && $panelCan(\App\Tenancy\Permission::SiteView))
         <div class="group">Web Sitesi</div>
         <a href="{{ route('panel.website.content', 'page') }}" @class(['active' => request()->is('app/website/page')])>Ana Sayfa ve Sayfalar</a>

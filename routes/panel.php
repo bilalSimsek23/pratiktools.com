@@ -11,6 +11,7 @@ use App\Http\Controllers\Panel\OperationsController;
 use App\Http\Controllers\Panel\ReconciliationController;
 use App\Http\Controllers\Panel\ReferenceController;
 use App\Http\Controllers\Panel\SegmentAutomationController;
+use App\Http\Controllers\Panel\TeamController;
 use App\Http\Controllers\Panel\WebsiteController;
 use App\Http\Middleware\EnsureSiteOwner;
 use App\Http\Middleware\PanelRecentAuth;
@@ -97,6 +98,14 @@ Route::middleware('auth:web')->group(function () {
         Route::get('iys/reconciliation/{batch}', [ReconciliationController::class, 'show'])->whereUuid('batch')->name('reconciliation.show');
         Route::post('iys/reconciliation/{batch}/apply', [ReconciliationController::class, 'apply'])->whereUuid('batch')->middleware(PanelRecentAuth::class)->name('reconciliation.apply');
         Route::get('settings', [OperationsController::class, 'settings'])->name('settings');
+        // Ayarlar › Ekip: tenant from the session membership, never from input.
+        Route::get('team', [TeamController::class, 'index'])->name('team');
+        Route::middleware(PanelRecentAuth::class)->group(function () {
+            Route::post('team/invitations', [TeamController::class, 'invite'])->middleware('throttle:20,1')->name('team.invite');
+            Route::post('team/{member}/role', [TeamController::class, 'role'])->whereUuid('member')->name('team.role');
+            Route::post('team/{member}/status', [TeamController::class, 'status'])->whereUuid('member')->name('team.status');
+            Route::post('team/{member}/invitation', [TeamController::class, 'reissue'])->whereUuid('member')->middleware('throttle:20,1')->name('team.invitation');
+        });
         Route::middleware(EnsureSiteOwner::class)->prefix('website')->name('website.')->group(function () {
             Route::get('seo', [WebsiteController::class, 'seo'])->name('seo');
             Route::get('references', [ReferenceController::class, 'index'])->name('references');

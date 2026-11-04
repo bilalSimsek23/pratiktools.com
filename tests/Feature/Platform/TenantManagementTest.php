@@ -154,7 +154,7 @@ final class TenantManagementTest extends TestCase
         $owner = User::query()->where('email', 'ayse@abc-tekstil.test')->sole();
         $this->inTenantId($t->id, fn () => DB::table('tenant_users')->where('user_id', $owner->id)->update(['status' => 'active']));
         $owner->forceFill(['activated_at' => now()])->save();
-        foreach (['/app/', '/app/settings'] as $page) {
+        foreach (['/app/', '/app/settings', '/app/team'] as $page) {
             $this->actingAs($owner, 'web')->withSession([PanelTenant::SESSION_TENANT => $t->id, PanelRecentAuth::SESSION_KEY => time()])->get("http://localhost{$page}")
                 ->assertOk()->assertDontSee('Sözleşme Kasım');
         }
