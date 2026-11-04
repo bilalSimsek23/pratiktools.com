@@ -203,4 +203,58 @@ final class SiteStorageTest extends TestCase
         Storage::set('site-media', $down);
         $this->artisan('site:storage-check')->assertFailed()->expectsOutputToContain('FAIL');
     }
+
+    public function test_explicit_disk_is_checked_alone_and_the_default_stays_the_saved_disk(): void
+    {
+        // A second attached bucket (new key) next to the live "site-media".
+        config(['filesystems.disks.site-media-v2' => ['driver' => 's3', 'bucket' => 'v2-bucket', 'region' => 'auto', 'endpoint' => 'https://v2-endpoint.test',
+            'key' => 'V2ACCESSKEYID', 'secret' => 'v2-secret-value', 'throw' => false]]);
+        Storage::fake('site-media-v2');
+        $this->assertTrue(SiteSettings::persistentDisk('site-media-v2'), 'Accepted as object storage in production.');
+        $untouched = \Mockery::mock(Filesystem::class);
+        Storage::set('site-media', $untouched);
+
+        $this->artisan('site:storage-check', ['--disk' => 'site-media-v2'])->assertSuccessful()->expectsOutputToContain('Storage check PASS')
+            ->expectsTable(['check', 'result'], [['disk', 'site-media-v2'], ['driver', 's3'], ['persistent', 'yes'], ['configured', 'PASS'], ['write', 'PASS'],
+                ['exists', 'PASS'], ['read_hash', 'PASS'], ['delete', 'PASS'], ['gone', 'PASS'], ['error', '—']])
+            ->doesntExpectOutputToContain('v2-bucket')->doesntExpectOutputToContain('V2ACCESSKEYID')
+            ->doesntExpectOutputToContain('v2-secret-value')->doesntExpectOutputToContain('v2-endpoint');
+        $untouched->shouldNotHaveReceived('put');
+        $this->assertSame([], Storage::disk('site-media-v2')->allFiles(), 'Test object removed.');
+        $this->assertSame('site-media', app(SiteSettings::class)->mediaDisk(), 'Saved / detected media disk unchanged.');
+
+        // Without --disk: still the media disk, never the new one.
+        Storage::fake('site-media');
+        $v2 = \Mockery::mock(Filesystem::class);
+        Storage::set('site-media-v2', $v2);
+        $this->artisan('site:storage-check')->assertSuccessful()->expectsOutputToContain('Storage check PASS');
+        $v2->shouldNotHaveReceived('put');
+    }
+
+    public function test_explicit_disk_failures_are_short_and_still_clean_up(): void
+    {
+        config(['filesystems.disks.site-media-v2' => ['driver' => 's3', 'bucket' => 'v2-bucket', 'key' => 'V2ACCESSKEYID', 'secret' => 'v2-secret-value', 'throw' => true]]);
+
+        // Read fails after the write: the object is still deleted.
+        $flaky = \Mockery::mock(Filesystem::class);
+        $flaky->allows('put')->andReturn(true);
+        $flaky->allows('exists')->andReturn(true, false);
+        $flaky->allows('get')->andThrow(new \RuntimeException('403 for V2ACCESSKEYID at https://v2-endpoint.test/v2-bucket'));
+        $flaky->expects('delete')->once()->andReturn(true);
+        Storage::set('site-media-v2', $flaky);
+        $this->artisan('site:storage-check', ['--disk' => 'site-media-v2'])->assertFailed()->expectsOutputToContain('Storage check FAIL')
+            ->expectsOutputToContain('RuntimeException')
+            ->doesntExpectOutputToContain('V2ACCESSKEYID')->doesntExpectOutputToContain('v2-endpoint')->doesntExpectOutputToContain('v2-bucket');
+
+        // Access denied on write.
+        $denied = \Mockery::mock(Filesystem::class);
+        $denied->allows('put')->andThrow(new \RuntimeException('AccessDenied V2ACCESSKEYID'));
+        $denied->allows('delete')->andReturn(true);
+        $denied->allows('exists')->andReturn(false);
+        Storage::set('site-media-v2', $denied);
+        $this->artisan('site:storage-check', ['--disk' => 'site-media-v2'])->assertFailed()->doesntExpectOutputToContain('V2ACCESSKEYID');
+
+        // Unknown disk name: no storage call, short reason.
+        $this->artisan('site:storage-check', ['--disk' => 'site-media-v3'])->assertFailed()->expectsOutputToContain('disk_not_configured');
+    }
 }

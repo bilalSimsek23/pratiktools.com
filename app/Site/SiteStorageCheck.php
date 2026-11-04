@@ -30,10 +30,14 @@ final class SiteStorageCheck
         $body = 'pratiktools-storage-check '.bin2hex(random_bytes(16));
         try {
             $steps['configured'] = config("filesystems.disks.{$disk}") !== null;
-            $storage = Storage::disk($disk);
-            $steps['write'] = $storage->put($key, $body) === true;
-            $steps['exists'] = $steps['write'] && $storage->exists($key);
-            $steps['read_hash'] = $steps['exists'] && hash_equals(hash('sha256', $body), hash('sha256', (string) $storage->get($key)));
+            if ($steps['configured']) {
+                $storage = Storage::disk($disk);
+                $steps['write'] = $storage->put($key, $body) === true;
+                $steps['exists'] = $steps['write'] && $storage->exists($key);
+                $steps['read_hash'] = $steps['exists'] && hash_equals(hash('sha256', $body), hash('sha256', (string) $storage->get($key)));
+            } else {
+                $error = 'disk_not_configured';
+            }
         } catch (Throwable $e) {
             $error = class_basename($e);
         } finally {
