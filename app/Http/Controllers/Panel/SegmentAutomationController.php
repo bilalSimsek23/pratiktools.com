@@ -128,6 +128,7 @@ final class SegmentAutomationController extends Controller
     public function dryRunAutomation(string $automation, DryRun $dryRun): RedirectResponse
     {
         $this->authorizePanel(Permission::AutomationsView);
+        $this->ownOr404('automations', $automation);
         try {
             $r = $dryRun->run($automation, $this->actor(), maxCandidates: 5000);
         } catch (AutomationDefinitionError $e) {
@@ -141,6 +142,7 @@ final class SegmentAutomationController extends Controller
     public function automationState(Request $request, string $automation, Automations $automations): RedirectResponse
     {
         $this->authorizePanel(Permission::AutomationsManage);
+        $this->ownOr404('automations', $automation);
         $action = (string) $request->validate(['action' => 'required|in:publish,pause,archive'])['action'];
         try {
             match ($action) {

@@ -56,6 +56,7 @@ final class LeadFormController extends Controller
     public function active(Request $request, string $form, LeadForms $forms): RedirectResponse
     {
         $this->authorizePanel(Permission::FormsManage);
+        $this->ownOr404('lead_forms', $form);
         try {
             $forms->setActive($form, (bool) $request->validate(['active' => 'required|boolean'])['active'], $this->actor());
         } catch (LeadError $e) {
@@ -68,6 +69,7 @@ final class LeadFormController extends Controller
     public function consent(Request $request, string $form, LeadForms $forms): RedirectResponse
     {
         $this->authorizePanel(Permission::FormsManage);
+        $this->ownOr404('lead_forms', $form);
         try {
             $v = $forms->changeConsentText($form, (string) $request->validate(['consent_text' => 'required|string|max:4000'])['consent_text'], $this->actor());
         } catch (LeadError $e) {
@@ -80,6 +82,7 @@ final class LeadFormController extends Controller
     public function consentMode(Request $request, string $form, LeadForms $forms): RedirectResponse
     {
         $this->authorizePanel(Permission::FormsManage);
+        $this->ownOr404('lead_forms', $form);
         try {
             $forms->setConsentMode($form, (string) $request->validate(['consent_mode' => 'required|in:local_only,via'])['consent_mode'], $this->actor());
         } catch (LeadError $e) {

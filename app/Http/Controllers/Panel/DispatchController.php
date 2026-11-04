@@ -52,6 +52,7 @@ final class DispatchController extends Controller
     public function store(Request $request, string $campaign, CampaignDispatches $dispatches): RedirectResponse
     {
         $this->authorizePanel(Permission::CampaignsManage);
+        $this->ownOr404('campaigns', $campaign);
         $data = $request->validate(['channel' => 'required|in:email,push', 'recipients' => 'required|array|min:1', 'recipients.*' => 'uuid',
             'title' => 'nullable|string|max:120', 'body' => 'nullable|string|max:1000', 'new_generation' => 'nullable|boolean']);
         try {
@@ -90,6 +91,7 @@ final class DispatchController extends Controller
     public function queue(string $dispatch, CampaignDispatches $dispatches): RedirectResponse
     {
         $this->authorizePanel(Permission::CampaignsTestDispatch);
+        $this->ownOr404('campaign_dispatches', $dispatch);
         try {
             $dispatches->queue($dispatch, $this->userId());
         } catch (DispatchBlocked $e) {
@@ -102,6 +104,7 @@ final class DispatchController extends Controller
     public function cancel(string $dispatch, CampaignDispatches $dispatches): RedirectResponse
     {
         $this->authorizePanel(Permission::CampaignsManage);
+        $this->ownOr404('campaign_dispatches', $dispatch);
         try {
             $dispatches->cancel($dispatch, $this->userId());
         } catch (DispatchBlocked $e) {

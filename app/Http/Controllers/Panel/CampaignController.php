@@ -116,6 +116,8 @@ final class CampaignController extends Controller
     public function update(Request $request, string $campaign, Campaigns $campaigns): RedirectResponse
     {
         $this->authorizePanel(Permission::CampaignsManage);
+        // Unknown or another tenant's campaign: 404 (RLS hides it).
+        $this->find($campaigns, $campaign);
         try {
             $campaigns->update($campaign, $this->input($request), $this->actor());
         } catch (CampaignError $e) {
@@ -138,6 +140,7 @@ final class CampaignController extends Controller
     public function transition(Request $request, string $campaign, Campaigns $campaigns): RedirectResponse
     {
         $this->authorizePanel(Permission::CampaignsPublish);
+        $this->find($campaigns, $campaign);
         $data = $request->validate(['to' => 'required|in:ready,scheduled,paused,cancelled,archived', 'scheduled_at' => 'nullable|date']);
         try {
             $campaigns->transition($campaign, CampaignStatus::from($data['to']), $this->actor(), isset($data['scheduled_at']) ? CarbonImmutable::parse($data['scheduled_at']) : null);
@@ -151,6 +154,7 @@ final class CampaignController extends Controller
     public function reopen(string $campaign, Campaigns $campaigns): RedirectResponse
     {
         $this->authorizePanel(Permission::CampaignsManage);
+        $this->find($campaigns, $campaign);
         try {
             $campaigns->reopen($campaign, $this->actor());
         } catch (CampaignError $e) {
