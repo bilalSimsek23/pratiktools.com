@@ -13,6 +13,7 @@ enum AuditAction: string
     case TenantMembershipDisabled = 'tenant.membership.disabled';
     case TenantMembershipEnabled = 'tenant.membership.enabled';
     case TenantRoleChanged = 'tenant.role.changed';
+    case TenantMetadataUpdated = 'tenant.metadata_updated';
     case PlatformReauthenticated = 'platform.reauthenticated';
     case PlatformTenantNoteChanged = 'platform.tenant_note.changed';
     case TenantSettingsUpdated = 'tenant.settings_updated';

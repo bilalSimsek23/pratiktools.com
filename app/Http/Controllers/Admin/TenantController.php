@@ -8,6 +8,7 @@ use App\Models\PlatformAdmin;
 use App\Platform\PlatformTenantNotes;
 use App\Platform\PlatformTenants;
 use App\Platform\TenantLifecycle;
+use App\Platform\TenantMetadata;
 use App\Tenancy\ProvisioningError;
 use App\Tenancy\TenantProvisioner;
 use App\Tenancy\TenantRole;
@@ -99,6 +100,27 @@ final class TenantController extends Controller
         }
 
         return back()->with('status', $d['action'] === 'suspend' ? 'Müşteri askıya alındı. Veriler silinmedi.' : 'Müşteri yeniden aktif.');
+    }
+
+    /**
+     * Genel › Temel bilgiler: name, code, phone, region and language. The id,
+     * public id, owner, status and data key are never changed here.
+     */
+    public function metadata(Request $request, string $tenant, PlatformTenants $tenants, TenantMetadata $metadata): RedirectResponse
+    {
+        $t = $tenants->find($tenant) ?? abort(404);
+        $d = $request->validate([
+            'name' => ['required', 'string', 'max:160'], 'slug' => ['required', 'string', 'max:63'], 'slug_confirmation' => ['nullable', 'string', 'max:63'],
+            'contact_phone' => ['nullable', 'string', 'max:32'], 'country' => ['required', 'string', 'size:2'], 'timezone' => ['required', 'string', 'max:64'],
+            'currency' => ['required', 'string', 'size:3'], 'locale' => ['required', 'string', 'max:16'],
+        ]);
+        try {
+            $changed = $metadata->update($t->id, $d, $d['slug_confirmation'] ?? null, $this->actor());
+        } catch (ProvisioningError $e) {
+            return back()->withInput()->withErrors(['metadata' => $e->getMessage()]);
+        }
+
+        return back()->with('status', $changed === [] ? 'Değişiklik yok.' : 'Müşteri bilgileri güncellendi.');
     }
 
     public function note(Request $request, string $tenant, PlatformTenants $tenants, PlatformTenantNotes $notes): RedirectResponse

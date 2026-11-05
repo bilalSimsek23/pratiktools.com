@@ -130,6 +130,47 @@ history. Idempotent per reference and provider reference.
   channels arrive only through it. Its parser is not configured until the
   real report format is known.
 
+## ViA Frame (Super Admin, per tenant)
+
+ViA Frame is ViA's official form: a script from
+`https://viaframe.iys.org.tr/widget/load-widgetloader/{FORM_ID}` plus a
+`<div id="{FORM_ID}">` container on the tenant's own page. It is not an
+iframe: the script injects its JS/CSS into the host page. ViA runs the OTP
+and records the consent at İYS itself. PratikTools stores the configuration,
+shows readiness and produces the embed code — nothing else:
+
+- No call to ViA or İYS, no OTP, no consent ledger row, no browser event
+  endpoint. Browser events (`on-frame-loaded-success`, `on-start-process*`,
+  `on-complete-process-success|error`; documented payload: only
+  `event.detail.message`) are not consent evidence.
+- `IysViaOtpProvider` / server-side OTP and direct İYS writes stay closed
+  (`IysViaProvider::status()` is unchanged; `IYS_ALLOW_PRODUCTION=false`).
+
+Super Admin › Müşteriler › {tenant} › Entegrasyonlar › **İYS / ViA**
+(`/tenants/{id}/integrations/via`, second factor; changes also need a recent
+password). The configuration is the same tenant integration row
+(`provider = via`, `capability = consent_acquisition`), read and written in
+the tenant's own context (runtime role, RLS); the platform role gets no
+access to integration settings.
+
+| Setting | Notes |
+|---|---|
+| `iys_number`, `brand`, `package_status` | as the İYS portal shows |
+| `form_id` | the ViA Form ID; must be a UUID here (lowercased); public configuration, not a secret |
+| `form_type` / `approval_type` | saved as OTP / ETK |
+| `form_status` | through the audited status action; "Onaylandı" needs the portal confirmation (portal: "Yayında") |
+| `frame_origins` | `https://host[:port]` only — no path, query, fragment, credentials, IP or wildcard; lowercased, default port dropped, duplicates removed; at most 10 |
+
+Readiness (`ViaFrameReadiness`, stored settings only):
+`Yapılandırılmadı` (no row) · `Taslak / eksik` · `Yapılandırma hazır (ViA
+tarafından doğrulanmadı)` (İYS no, brand, active package, OTP, UUID Form ID,
+approved, ≥ 1 origin) · `Sorunlu` (rejected/disabled form, inactive package,
+invalid Form ID or form type). The embed code is shown only when ready and
+contains only the public Form ID.
+
+Audit: `consent.via_configured` (changed keys, form status, `created`; never
+the Form ID value), `consent.via_form_status_changed` (from/to/note).
+
 ## Activation checklist (when İYS answers)
 
 1. Portal shows the form approved → admin records `approved` in the panel.

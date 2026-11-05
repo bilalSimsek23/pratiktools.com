@@ -32,8 +32,29 @@
             <dt>Kullanıcı</dt><dd>{{ $members->where('status', 'active')->count() }} aktif · {{ $members->where('status', 'invited')->count() }} davetli</dd>
             <dt>Telefon</dt><dd>{{ $t->contact_phone ?: '—' }}</dd>
             <dt>Plan</dt><dd class="muted">{{ $t->plan ?: 'Tanımlı değil (ödeme/faturalama yok)' }}</dd>
-            <dt>Bölge</dt><dd>{{ $t->country }} · {{ $t->timezone }} · {{ $t->currency }}</dd>
+            <dt>Bölge</dt><dd>{{ $t->country }} · {{ $t->timezone }} · {{ $t->currency }} · {{ $t->locale }}</dd>
         </dl>
+    </div>
+    <div class="card"><h2>Temel bilgileri düzenle</h2>
+        <p class="muted">Müşteri kimliği (ID), webhook kimliği, owner, durum ve veri anahtarı buradan değişmez. Değişiklikler audit'e yazılır.</p>
+        @error('metadata')<div class="alert">{{ $message }}</div>@enderror
+        <form class="form-grid" method="post" action="{{ route('admin.tenants.metadata', $t->id) }}">@csrf
+            <label>Şirket adı <input type="text" name="name" required maxlength="160" value="{{ old('name', $t->name) }}"></label>
+            @if ($t->site_owner)
+                <input type="hidden" name="slug" value="{{ $t->slug }}">
+                <p class="hint">Kod (<code>{{ $t->slug }}</code>) değiştirilemez: web sitesi sahibini koduyla bulur.</p>
+            @else
+                <label>Kod <input type="text" name="slug" required maxlength="63" pattern="[a-z0-9][a-z0-9-]{1,62}" value="{{ old('slug', $t->slug) }}"></label>
+                <label>Kod değişiyorsa yeni kodu tekrar yazın <input type="text" name="slug_confirmation" maxlength="63" autocomplete="off" value=""></label>
+                <p class="hint">Kod yalnız operatör komutlarında (<code>--tenant=</code>) kullanılır; ilişkiler ve bağlantılar müşteri kimliğine bağlıdır. Eski kod serbest kalır.</p>
+            @endif
+            <label>Telefon <input type="text" name="contact_phone" maxlength="32" value="{{ old('contact_phone', $t->contact_phone) }}"></label>
+            <label>Ülke (ISO) <input type="text" name="country" required maxlength="2" value="{{ old('country', $t->country) }}"></label>
+            <label>Saat dilimi <input type="text" name="timezone" required maxlength="64" value="{{ old('timezone', $t->timezone) }}"></label>
+            <label>Para birimi (ISO) <input type="text" name="currency" required maxlength="3" value="{{ old('currency', $t->currency) }}"></label>
+            <label>Dil <input type="text" name="locale" required maxlength="16" value="{{ old('locale', $t->locale) }}"></label>
+            <div><button class="btn-primary" type="submit">Kaydet</button></div>
+        </form>
     </div>
     <div class="card"><h2>Platform notu</h2>
         <p class="muted">Yalnız PratikTools platform yöneticileri görür; müşteri hiçbir yoldan okuyamaz. Şifre, anahtar veya token yazmayın.</p>
@@ -104,8 +125,8 @@
     <p class="muted">Yalnız durum gösterilir; secret, anahtar veya ayar değeri bu alanda hiçbir zaman gösterilmez.</p>
 <table>
     <thead><tr><th>Entegrasyon</th><th>Durum</th><th>Son doğrulama</th></tr></thead>
-    <tbody>@foreach ($integrations as $i)
-        <tr><td>{{ $i['label'] }}</td><td>@include('admin.tenants._state', ['state' => $i['state']])</td>
+    <tbody>@foreach ($integrations as $provider => $i)
+        <tr><td>@if ($provider === 'iys')<a href="{{ route('admin.tenants.via', $t->id) }}">{{ $i['label'] }}</a>@else{{ $i['label'] }}@endif</td><td>@include('admin.tenants._state', ['state' => $i['state']])</td>
             <td class="muted">{{ $i['last_verified_at'] ? \Illuminate\Support\Carbon::parse($i['last_verified_at'])->format('d.m.Y H:i') : '—' }}</td></tr>
     @endforeach</tbody>
 </table>

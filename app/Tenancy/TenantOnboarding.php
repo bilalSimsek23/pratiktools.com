@@ -34,13 +34,15 @@ final class TenantOnboarding
     {
         $states = array_fill_keys(array_keys(self::PROVIDERS), 'not_configured');
         foreach ($rows as $row) {
-            if (! isset($states[$row->provider])) {
+            // ViA (consent acquisition) is part of the İYS / ViA step.
+            $provider = $row->provider === 'via' ? 'iys' : $row->provider;
+            if (! isset($states[$provider])) {
                 continue;
             }
             $state = self::state((string) $row->status);
             // Several capabilities per provider: the best one counts.
-            if (self::RANK[$state] > self::RANK[$states[$row->provider]]) {
-                $states[$row->provider] = $state;
+            if (self::RANK[$state] > self::RANK[$states[$provider]]) {
+                $states[$provider] = $state;
             }
         }
 

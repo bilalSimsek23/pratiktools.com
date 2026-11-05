@@ -13,8 +13,9 @@ use InvalidArgumentException;
 /**
  * Stored ViA configuration of the tenant and its form status.
  *
- * - configure(): operator CLI (consent:via) records what the İYS portal
- *   shows; the Form ID is never part of the code base.
+ * - configure(): operator CLI (consent:via) or Super Admin (Müşteriler ›
+ *   Entegrasyonlar › İYS / ViA) records what the İYS portal shows and the
+ *   ViA Frame origins; the Form ID is never part of the code base.
  * - setFormStatus(): an authorized, audited act after the status was seen
  *   in the İYS portal. Approval needs an explicit confirmation; nothing
  *   approves a form automatically.
@@ -39,7 +40,7 @@ final class ViaConfigurations
     }
 
     /**
-     * @param  array{iys_number?: string, brand?: string, package_status?: string, form_type?: string, approval_type?: string, form_id?: string, form_status?: string}  $values
+     * @param  array{iys_number?: string, brand?: string, package_status?: string, form_type?: string, approval_type?: string, form_id?: string, form_status?: string, frame_origins?: list<string>}  $values
      */
     public function configure(array $values, Actor $actor): ViaConfig
     {
@@ -62,7 +63,10 @@ final class ViaConfigurations
         if (isset($values['iys_number']) && preg_match('/^\d{1,12}$/', $values['iys_number']) !== 1) {
             throw new InvalidArgumentException('İYS number is numeric.');
         }
-        $values = array_map(fn ($v) => mb_substr(trim($v), 0, 128), $values);
+        if (array_key_exists('frame_origins', $values)) {
+            $values['frame_origins'] = ViaFrameOrigins::normalize((array) $values['frame_origins']);
+        }
+        $values = array_map(fn ($v) => is_array($v) ? $v : mb_substr(trim((string) $v), 0, 128), $values);
 
         $tenantId = $this->context->requireTenant();
         DB::transaction(function () use ($tenantId, $values, $actor) {
@@ -82,8 +86,9 @@ final class ViaConfigurations
                 DB::table('tenant_integrations')->where('tenant_id', $tenantId)->where('id', $id)->update(['settings' => json_encode($settings), 'updated_at' => now()]);
             }
             // Which fields changed, never the Form ID itself.
+            $changed = array_keys(array_filter($settings, fn ($v, $k) => json_encode($v) !== json_encode($before[$k] ?? null), ARRAY_FILTER_USE_BOTH));
             $this->audit->record(AuditAction::ViaConfigured, 'tenant_integration', $id,
-                ['changed' => array_keys(array_diff_assoc($settings, $before)), 'form_status' => $settings['form_status']], $actor);
+                ['changed' => $changed, 'form_status' => $settings['form_status'], 'created' => $row === null], $actor);
         });
 
         return $this->current() ?? throw new \LogicException('ViA configuration missing after save.');

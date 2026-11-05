@@ -17,7 +17,7 @@ Genel, Kullanıcılar, Entegrasyonlar, Kullanım, Audit.
 | Lists, details, counters, audit trail | `pgsql_platform` / `saas_platform` | Column grants only; no secret, setting or personal table |
 | Owner / member names and e-mails | `app_platform_tenant_owners()`, `app_platform_tenant_members(uuid)` | SECURITY DEFINER, platform role only; `db:verify-roles` fails if the platform role can run any other definer function (besides `app_kek_inventory`) |
 | Platform notes | `platform_tenant_notes` on `pgsql_platform` | FORCE RLS, policy for the platform role only; `saas_app` has no grant (verified by `db:verify-roles`). Audited without the text; values that look like secrets are refused |
-| Create tenant, invite, role, disable, suspend | `pgsql` / `saas_app` inside `TenantContext::run($tenantId)` | FORCE RLS applies; the tenant id is the URL of an authenticated 2FA admin, checked to exist |
+| Create tenant, edit basic data, ViA configuration, invite, role, disable, suspend | `pgsql` / `saas_app` inside `TenantContext::run($tenantId)` | FORCE RLS applies; the tenant id is the URL of an authenticated 2FA admin, checked to exist |
 
 No `/app` request uses the platform connection; the platform connection is
 never chosen from request input.
@@ -105,6 +105,18 @@ policies.
   role deliberately does not have. Break-glass grants exist but no data path
   honours them.
 - **Plans / billing**: `tenants.plan` is an unused extension point (null).
+
+## Editing a tenant (Genel › Temel bilgileri düzenle)
+
+Name, code (slug), contact phone, country, timezone, currency and locale
+(`App\Platform\TenantMetadata`, recent password, tenant's own context).
+Never the id, public id, owner, status, plan or data key. Every relation,
+job, session, API token and webhook uses the tenant id or public id; the
+code is only an operator handle (`--tenant=<code>`). Changing it needs the
+new code typed again; the old code becomes free; the website owner's code
+cannot change here (the website finds its owner by code). Audit
+`tenant.metadata_updated`: changed fields with old/new values, the contact
+phone only as "changed".
 
 ## Production
 

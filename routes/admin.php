@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\RequestDiagnosticsController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Admin\TenantController;
 use App\Http\Controllers\Admin\TenantMemberController;
+use App\Http\Controllers\Admin\TenantViaController;
 use App\Http\Controllers\Admin\TwoFactorController;
 use App\Http\Middleware\EnsurePlatformTwoFactor;
 use App\Http\Middleware\PlatformRecentAuth;
@@ -47,10 +48,14 @@ Route::name('admin.')->group(function () {
             Route::get('tenants', [TenantController::class, 'index'])->name('tenants');
             Route::get('tenants/new', [TenantController::class, 'create'])->name('tenants.create');
             Route::get('tenants/{tenant}', [TenantController::class, 'show'])->whereUuid('tenant')->name('tenants.show');
+            Route::get('tenants/{tenant}/integrations/via', [TenantViaController::class, 'show'])->whereUuid('tenant')->name('tenants.via');
             Route::middleware(PlatformRecentAuth::class)->group(function () {
                 Route::post('tenants', [TenantController::class, 'store'])->middleware('throttle:20,1')->name('tenants.store');
                 Route::post('tenants/{tenant}/status', [TenantController::class, 'status'])->whereUuid('tenant')->name('tenants.status');
                 Route::post('tenants/{tenant}/note', [TenantController::class, 'note'])->whereUuid('tenant')->name('tenants.note');
+                Route::post('tenants/{tenant}/metadata', [TenantController::class, 'metadata'])->whereUuid('tenant')->name('tenants.metadata');
+                Route::post('tenants/{tenant}/integrations/via', [TenantViaController::class, 'update'])->whereUuid('tenant')->name('tenants.via.update');
+                Route::post('tenants/{tenant}/integrations/via/status', [TenantViaController::class, 'status'])->whereUuid('tenant')->name('tenants.via.status');
                 Route::post('tenants/{tenant}/members', [TenantMemberController::class, 'store'])->whereUuid('tenant')->middleware('throttle:30,1')->name('tenants.members.store');
                 Route::post('tenants/{tenant}/members/{member}/role', [TenantMemberController::class, 'role'])->whereUuid(['tenant', 'member'])->name('tenants.members.role');
                 Route::post('tenants/{tenant}/members/{member}/status', [TenantMemberController::class, 'status'])->whereUuid(['tenant', 'member'])->name('tenants.members.status');
