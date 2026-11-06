@@ -2,14 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Audit\AuditAction;
-use App\Audit\AuditLogger;
+use App\Audit\Actor;
+use App\Commerce\TicimaxIntegrations;
 use App\Console\Commands\Concerns\RunsInTenantContext;
-use App\Models\TenantIntegration;
-use App\Security\OutboundUrlGuard;
-use App\Security\Vault\SecretVault;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Symfony\Component\Console\Input\StreamableInputInterface;
 
@@ -17,7 +13,7 @@ use Symfony\Component\Console\Input\StreamableInputInterface;
  * Creates or updates a tenant's Ticimax commerce integration. The member
  * code (UyeKodu) is read from STDIN only, so it never appears in shell
  * history, process lists or command arguments, and is stored only in the
- * vault.
+ * vault (see TicimaxIntegrations, shared with Super Admin).
  */
 final class ConnectTicimax extends Command
 {
@@ -31,20 +27,8 @@ final class ConnectTicimax extends Command
 
     protected $description = 'Connect a tenant to Ticimax (read-only commerce integration)';
 
-    public function handle(SecretVault $vault, AuditLogger $audit, OutboundUrlGuard $guard): int
+    public function handle(TicimaxIntegrations $integrations): int
     {
-        $serviceUrl = rtrim((string) $this->option('service-url'), '/').'/';
-        $storefrontUrl = rtrim((string) $this->option('storefront-url'), '/');
-
-        try {
-            $guard->assertSafe($serviceUrl);
-            $guard->assertSafe($storefrontUrl);
-        } catch (InvalidArgumentException $e) {
-            $this->error('Invalid URL: '.$e->getMessage());
-
-            return self::INVALID;
-        }
-
         $secret = null;
         if ($this->option('secret-stdin')) {
             $stream = $this->input instanceof StreamableInputInterface && $this->input->getStream() !== null ? $this->input->getStream() : STDIN;
@@ -56,39 +40,17 @@ final class ConnectTicimax extends Command
             }
         }
 
-        $integration = $this->inTenant(fn (string $tenantId) => DB::transaction(function () use ($tenantId, $serviceUrl, $storefrontUrl, $secret, $vault, $audit) {
-            $integration = TenantIntegration::query()->where('provider', 'ticimax')->where('capability', 'commerce')->first();
-            $created = $integration === null;
+        try {
+            $integration = $this->inTenant(fn () => $integrations->save((string) $this->option('service-url'), (string) $this->option('storefront-url'), $secret,
+                Actor::console($this->getName())));
+        } catch (InvalidArgumentException $e) {
+            $this->error($e->getMessage());
 
-            $integration ??= new TenantIntegration(['provider' => 'ticimax', 'capability' => 'commerce', 'status' => 'pending']);
-            $integration->tenant_id = $tenantId;
-            $integration->settings = ['service_url' => $serviceUrl, 'storefront_url' => $storefrontUrl];
+            return self::INVALID;
+        } finally {
+            unset($secret);
+        }
 
-            if ($created && $secret === null) {
-                throw new InvalidArgumentException('A new integration needs --secret-stdin.');
-            }
-
-            $previous = $integration->secret_fingerprint;
-            if ($secret !== null) {
-                $vault->seal($integration, $secret);
-                $integration->status = 'pending';
-            }
-            $integration->save();
-
-            if ($created) {
-                $audit->record(AuditAction::IntegrationCreated, 'tenant_integration', $integration->id, ['provider' => 'ticimax', 'capability' => 'commerce']);
-            }
-            if ($secret !== null) {
-                $audit->record($created ? AuditAction::IntegrationSecretCreated : AuditAction::IntegrationSecretChanged, 'tenant_integration', $integration->id, array_filter([
-                    'previous_fingerprint' => $created ? null : $previous,
-                    'fingerprint' => $integration->secret_fingerprint,
-                ]));
-            }
-
-            return $integration;
-        }));
-
-        unset($secret);
         $this->info("Ticimax integration {$integration->id} saved (status: {$integration->status}). Run commerce:test next.");
 
         return self::SUCCESS;

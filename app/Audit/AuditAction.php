@@ -25,6 +25,7 @@ enum AuditAction: string
     case IntegrationSecretChanged = 'integration.secret_changed';
     case IntegrationVerified = 'integration.verified';
     case IntegrationDeleted = 'integration.deleted';
+    case IntegrationSettingsChanged = 'integration.settings_changed';
     case SecretDecrypted = 'secret.decrypted';
     case DataKeyCreated = 'vault.data_key_created';
     case DataKeyRotated = 'vault.data_key_rotated';

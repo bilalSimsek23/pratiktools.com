@@ -126,7 +126,7 @@
 <table>
     <thead><tr><th>Entegrasyon</th><th>Durum</th><th>Son doğrulama</th></tr></thead>
     <tbody>@foreach ($integrations as $provider => $i)
-        <tr><td>@if ($provider === 'iys')<a href="{{ route('admin.tenants.via', $t->id) }}">{{ $i['label'] }}</a>@else{{ $i['label'] }}@endif</td><td>@include('admin.tenants._state', ['state' => $i['state']])</td>
+        <tr><td>@if ($provider === 'iys')<a href="{{ route('admin.tenants.via', $t->id) }}">{{ $i['label'] }}</a>@elseif ($provider === 'ticimax')<a href="{{ route('admin.tenants.ticimax', $t->id) }}">{{ $i['label'] }}</a>@else{{ $i['label'] }}@endif</td><td>@include('admin.tenants._state', ['state' => $i['state']])</td>
             <td class="muted">{{ $i['last_verified_at'] ? \Illuminate\Support\Carbon::parse($i['last_verified_at'])->format('d.m.Y H:i') : '—' }}</td></tr>
     @endforeach</tbody>
 </table>
