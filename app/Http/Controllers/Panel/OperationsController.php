@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Panel;
 use App\Commerce\Sync\CommerceRelink;
 use App\Consent\Via\ViaConfigurations;
 use App\Consent\Via\ViaFormStatus;
+use App\Email\EmailSendingMode;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Panel\Concerns\PanelHelpers;
 use App\Notifications\TenantNotifications;
@@ -87,7 +88,7 @@ final class OperationsController extends Controller
         $tenantId = app(TenantContext::class)->requireTenant();
 
         return view('panel.settings', ['tenantMode' => DB::table('tenant_settings')->where('tenant_id', $tenantId)->value('sending_mode'), 'emailMode' => $s['amazon_ses']['sending_mode'],
-            'pushMode' => $s['onesignal']['sending_mode'], 'platformEmail' => (string) config('email.sending_mode'), 'platformPush' => (string) config('push.sending_mode'),
+            'pushMode' => $s['onesignal']['sending_mode'], 'platformEmail' => EmailSendingMode::platform()->value, 'platformPush' => (string) config('push.sending_mode'),
             'canChange' => $this->can(Permission::SendingModeUpdate), 'reason' => SendingModes::LIVE_DISABLED_REASON,
             'members' => DB::table('tenant_users as m')->join('users as u', 'u.id', '=', 'm.user_id')->where('m.tenant_id', $tenantId)->orderBy('u.name')->get(['u.name', 'm.role', 'm.status'])]);
     }

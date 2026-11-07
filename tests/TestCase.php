@@ -34,6 +34,9 @@ abstract class TestCase extends BaseTestCase
         DB::connection('pgsql_owner')->statement('TRUNCATE site_reference_contents, site_references, site_content_relations, site_contents, site_categories, site_media, site_settings, site_events_daily CASCADE');
         InitialContent::install();
         InitialReferences::install();
+        // The Super Admin e-mail switch starts open in tests, so the configured
+        // EMAIL_SENDING_MODE alone decides (production starts it "off").
+        DB::connection('pgsql_owner')->table('platform_settings')->where('key', 'email.sending_mode')->update(['value' => 'live', 'updated_by' => null]);
 
         $this->app->make(TenantContext::class)->clear();
     }

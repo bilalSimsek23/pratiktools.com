@@ -137,6 +137,8 @@ enum AuditAction: string
     case TestPushQueued = 'dispatch.test_push_queued';
     case SendingModeChanged = 'tenant.sending_mode_changed';
     case SendingModeChangeRefused = 'tenant.sending_mode_change_refused';
+    case PlatformEmailSendingModeChanged = 'platform.email_sending_mode_changed';
+    case PlatformEmailSendingModeChangeRefused = 'platform.email_sending_mode_change_refused';
     case PanelLogin = 'panel.login';
     case PanelLoginFailed = 'panel.login_failed';
     case PanelReauthenticated = 'panel.reauthenticated';

@@ -17,7 +17,12 @@
 <div class="card">
     <p class="muted">Bu ekran AWS'de veya DNS'te hiçbir şey oluşturmaz ya da değiştirmez: SES'ten yalnız okuma yapar. Domain kimliği, Configuration Set, SNS topic ve abonelik AWS konsolunda;
         DNS kayıtları alan adı sağlayıcısında oluşturulur. AWS kimlik bilgileri şifreli kasada saklanır ve hiçbir zaman bu ekranda gösterilmez.
-        Gönderim modu (platform: <code>{{ $readiness['mode']['platform'] }}</code>, müşteri: <code>{{ $readiness['mode']['tenant'] }}</code>) bu ekrandan değiştirilmez.</p>
+        Gönderim modu bu ekrandan değiştirilmez: platform modu Sistem Durumu'ndan, müşteri modu müşteri panelinden yönetilir.</p>
+    <dl class="kv" id="gonderim-modlari">
+        <dt>Platform modu</dt><dd><code>{{ strtoupper($readiness['mode']['platform']) }}</code> <a href="{{ route('admin.system') }}#eposta-gonderim-modu">Sistem Durumu</a></dd>
+        <dt>{{ $t->name }} modu</dt><dd><code>{{ strtoupper($readiness['mode']['tenant']) }}</code></dd>
+        <dt>Etkin mod</dt><dd><code>{{ strtoupper($readiness['mode']['effective']) }}</code> <span class="muted">— {{ $readiness['mode']['reason'] }}</span></dd>
+    </dl>
 </div>
 
 <div class="grid g2">

@@ -54,6 +54,7 @@ Route::name('admin.')->group(function () {
             Route::get('tenants/{tenant}/integrations/ticimax', [TenantTicimaxController::class, 'show'])->whereUuid('tenant')->name('tenants.ticimax');
             Route::get('tenants/{tenant}/integrations/ses', [TenantSesController::class, 'show'])->whereUuid('tenant')->name('tenants.ses');
             Route::middleware(PlatformRecentAuth::class)->group(function () {
+                Route::post('system/email-sending-mode', [SystemController::class, 'emailSendingMode'])->middleware('throttle:admin-email-mode')->name('system.email-sending-mode');
                 Route::post('tenants', [TenantController::class, 'store'])->middleware('throttle:20,1')->name('tenants.store');
                 Route::post('tenants/{tenant}/status', [TenantController::class, 'status'])->whereUuid('tenant')->name('tenants.status');
                 Route::post('tenants/{tenant}/note', [TenantController::class, 'note'])->whereUuid('tenant')->name('tenants.note');

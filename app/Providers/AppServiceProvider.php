@@ -137,6 +137,8 @@ class AppServiceProvider extends ServiceProvider
                 default => Limit::perMinute(20)->by($by),
             };
         });
+        // Platform e-mail switch: few changes per admin, wrong live confirmations included.
+        RateLimiter::for('admin-email-mode', fn (Request $request) => Limit::perMinute(5)->by('admin-email-mode:'.$request->user('platform')?->getAuthIdentifier()));
         RateLimiter::for('admin-activation', fn (Request $request) => Limit::perMinute(10)->by('admin-activation:'.$request->ip()));
 
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(240)->by(

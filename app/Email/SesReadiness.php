@@ -66,7 +66,7 @@ final class SesReadiness
     ) {}
 
     /**
-     * @return array{overall: string, overall_label: string, steps: array<string, array{label: string, state: string, detail: ?string}>, sender: ?object, mode: array{platform: string, tenant: string, effective: string}}
+     * @return array{overall: string, overall_label: string, steps: array<string, array{label: string, state: string, detail: ?string}>, sender: ?object, mode: array{platform: string, tenant: string, effective: string, reason: string}}
      */
     public function evaluate(?TenantIntegration $integration): array
     {
@@ -199,16 +199,19 @@ final class SesReadiness
     }
 
     /**
-     * @return array{platform: string, tenant: string, effective: string}
+     * @return array{platform: string, tenant: string, effective: string, reason: string}
      */
     public function modes(): array
     {
-        return ['platform' => EmailSendingMode::platform()->value, 'tenant' => (string) (DB::table('tenant_settings')->value('sending_mode') ?? 'off'), 'effective' => $this->guard->mode()->value];
+        $tenant = (string) (DB::table('tenant_settings')->value('sending_mode') ?? 'off');
+
+        return ['platform' => EmailSendingMode::platform()->value, 'tenant' => $tenant, 'effective' => $this->guard->mode()->value,
+            'reason' => PlatformEmailMode::explain(EmailSendingMode::ceiling(), app(PlatformEmailMode::class)->stored(), $tenant)];
     }
 
     /**
      * @param  array<string, array{label: string, state: string, detail: ?string}>  $steps
-     * @param  array{platform: string, tenant: string, effective: string}  $mode
+     * @param  array{platform: string, tenant: string, effective: string, reason: string}  $mode
      */
     private function overall(TenantIntegration $integration, array $steps, array $mode): string
     {
@@ -243,7 +246,7 @@ final class SesReadiness
     }
 
     /**
-     * @param  array{platform: string, tenant: string, effective: string}  $mode
+     * @param  array{platform: string, tenant: string, effective: string, reason: string}  $mode
      * @return array{label: string, state: string, detail: ?string}
      */
     private function modeStep(array $mode): array
