@@ -31,6 +31,7 @@ final class ConnectSes extends Command
         'INVALID_REGION' => 'Pass --region as an AWS region name.',
         'INVALID_CONFIGURATION_SET' => 'Invalid --configuration-set.',
         'INVALID_TOPIC_ARN' => 'Invalid --sns-topic-arn.',
+        'TOPIC_REGION_MISMATCH' => 'The SNS topic must be in the SES region.',
         'INVALID_ROLE' => '--role must be primary or secondary.',
         'KEY_PAIR_REQUIRED' => 'A new integration needs --secret-stdin.',
         'KEY_PAIR_INCOMPLETE' => 'STDIN must hold two lines: access key id, secret access key.',

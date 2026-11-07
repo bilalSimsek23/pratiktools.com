@@ -57,7 +57,7 @@ final class SesIntegrations
     {
         $region = strtolower(trim($region));
         $configurationSet = $configurationSet === null || trim($configurationSet) === '' ? null : trim($configurationSet);
-        $topicArns = array_values(array_unique(array_filter(array_map('trim', $topicArns), fn (string $a) => $a !== '')));
+        $topicArns = array_values(array_unique(array_filter(array_map(self::clean(...), $topicArns), fn (string $a) => $a !== '')));
         $secret = self::keyPair($accessKeyId, $secretAccessKey);
         unset($accessKeyId, $secretAccessKey);
 
@@ -70,6 +70,10 @@ final class SesIntegrations
         foreach ($topicArns as $arn) {
             if (! self::validTopicArn($arn)) {
                 throw new InvalidArgumentException('INVALID_TOPIC_ARN');
+            }
+            // SES publishes events only to a topic in the configuration set's own region.
+            if (explode(':', $arn)[3] !== $region) {
+                throw new InvalidArgumentException('TOPIC_REGION_MISMATCH');
             }
         }
         if ($tracking !== null && array_diff($tracking, self::TRACKING) !== []) {
@@ -141,6 +145,16 @@ final class SesIntegrations
             ['granted' => $grant ? EmailSendGuard::SCOPE : null, 'revoked' => $grant ? null : EmailSendGuard::SCOPE, 'scopes' => $scopes], $actor);
 
         return $scopes;
+    }
+
+    /**
+     * Text copied from the AWS console can carry invisible characters (no-break
+     * or zero-width spaces, a byte order mark) that trim() keeps; they are
+     * never part of an ARN.
+     */
+    public static function clean(string $value): string
+    {
+        return (string) preg_replace('/[\s\p{Z}\p{Cf}]+/u', '', $value);
     }
 
     public static function validTopicArn(string $arn): bool

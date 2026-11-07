@@ -46,6 +46,7 @@ final class TenantSes
         'INVALID_REGION' => 'Bölge geçersiz (ör. eu-central-1).',
         'INVALID_CONFIGURATION_SET' => 'Configuration Set adı yalnız harf, rakam, "_" ve "-" içerebilir (en fazla 64).',
         'INVALID_TOPIC_ARN' => 'SNS Topic ARN geçersiz (arn:aws:sns:<bölge>:<hesap>:<ad>).',
+        'TOPIC_REGION_MISMATCH' => 'SNS Topic, SES ile aynı bölgede olmalı (ör. ikisi de eu-central-1).',
         'INVALID_TRACKING' => 'Geçersiz izleme seçeneği.',
         'INVALID_ROLE' => 'Geçersiz rol.',
         'KEY_PAIR_REQUIRED' => 'İlk kurulumda AWS Access Key ID ve Secret Access Key zorunludur.',

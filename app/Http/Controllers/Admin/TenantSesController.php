@@ -49,7 +49,7 @@ final class TenantSesController extends Controller
         unset($d['aws_access_key_id'], $d['aws_secret_access_key']);
         $rotated = trim((string) $keyId) !== '' || trim((string) $secret) !== '';
         try {
-            $ses->configure($t->id, $d['region'], $d['configuration_set'] ?? null, preg_split('/[\s,]+/', (string) ($d['sns_topic_arns'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [],
+            $ses->configure($t->id, $d['region'], $d['configuration_set'] ?? null, preg_split('/[\s,\p{Z}]+/u', (string) ($d['sns_topic_arns'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [],
                 array_values($d['tracking'] ?? []), $keyId, $secret, $this->actor());
         } catch (ProvisioningError $e) {
             return back()->withInput($request->except(['aws_access_key_id', 'aws_secret_access_key']))->withErrors(['ses' => $e->getMessage()]);

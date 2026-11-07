@@ -229,6 +229,31 @@ final class TenantSesTest extends TestCase
         $this->assertNull($this->integration($other));
     }
 
+    public function test_the_production_topic_arn_is_accepted_even_with_invisible_characters_from_the_console(): void
+    {
+        $arn = 'arn:aws:sns:eu-central-1:801970945006:pratiktools-ses-events';
+        [$igs] = $this->createTenant('igs');
+        $this->save($igs, ['aws_access_key_id' => self::SES_ACCESS_KEY, 'aws_secret_access_key' => self::SES_SECRET, 'sns_topic_arns' => $arn,
+            'configuration_set' => 'pratiktools-production'])->assertSessionHasNoErrors();
+        $this->assertSame([$arn], json_decode($this->integration($igs)->settings, true)['sns_topic_arns']);
+
+        // Copied from the AWS console: no-break space, zero-width space, byte order mark, Windows line end.
+        foreach (["{$arn}\u{00A0}", "\u{200B}{$arn}", "\u{FEFF}{$arn}\r\n", " {$arn}\u{00A0}\n"] as $pasted) {
+            $this->save($igs, ['sns_topic_arns' => $pasted, 'configuration_set' => 'pratiktools-production'])->assertSessionHasNoErrors();
+            $this->assertSame([$arn], json_decode($this->integration($igs)->settings, true)['sns_topic_arns']);
+        }
+
+        // Still strict: another service, a short account id, a bad name, a topic in another region.
+        foreach (['arn:aws:sqs:eu-central-1:801970945006:pratiktools-ses-events', 'arn:aws:sns:eu-central-1:80197094500:pratiktools-ses-events',
+            'arn:aws:sns:eu-central-1:801970945006:pratiktools ses events', 'arn:aws:sns:eu-central-1:801970945006:pratiktools/ses', 'https://evil.example.com/'] as $bad) {
+            $this->save($igs, ['sns_topic_arns' => $bad])->assertSessionHasErrors('ses');
+            $this->assertStringContainsString('SNS Topic ARN geçersiz', (string) session('errors')->first('ses'));
+        }
+        $this->save($igs, ['sns_topic_arns' => 'arn:aws:sns:us-east-1:801970945006:pratiktools-ses-events'])->assertSessionHasErrors('ses');
+        $this->assertStringContainsString('aynı bölgede', (string) session('errors')->first('ses'));
+        $this->assertSame([$arn], json_decode($this->integration($igs)->settings, true)['sns_topic_arns'], 'A refused save keeps the stored topic.');
+    }
+
     public function test_the_account_check_shows_the_production_values_and_the_configuration_set(): void
     {
         [$igs] = $this->createTenant('igs');
