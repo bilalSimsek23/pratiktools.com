@@ -56,7 +56,7 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*', 'webhooks/*', 'health*') || $request->expectsJson(),
         );
 
-        $exceptions->dontFlash(['secret', 'password', 'password_confirmation', 'current_password', 'code', 'token']);
+        $exceptions->dontFlash(['secret', 'aws_access_key_id', 'aws_secret_access_key', 'password', 'password_confirmation', 'current_password', 'code', 'token']);
 
         // Never reveal internals; the exception is still reported.
         $exceptions->render(function (TenantContextMissing $e, Request $request) {

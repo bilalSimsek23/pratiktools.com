@@ -3,18 +3,16 @@
 namespace App\Console\Commands;
 
 use App\Audit\Actor;
-use App\Audit\AuditAction;
-use App\Audit\AuditLogger;
-use App\Connectors\Ses\SesWebhookHandler;
 use App\Console\Commands\Concerns\FindsEmailIntegration;
 use App\Console\Commands\Concerns\RunsInTenantContext;
 use App\Email\EmailMetrics;
-use App\Email\EmailProviderResolver;
 use App\Email\EmailSendGuard;
+use App\Email\SesAccountCheck;
+use App\Email\SesIntegrations;
+use App\Email\SnsConfirmationFailed;
+use App\Email\SnsSubscriptions;
 use App\Email\WarmupPlanner;
-use App\Models\WebhookInboxItem;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
 
 /**
  * Amazon SES operations:
@@ -23,6 +21,9 @@ use Illuminate\Support\Facades\Http;
  *   warmup                proposed warm-up plan (--pool), nothing is scheduled
  *   scope                 grant or revoke send_email (audited)
  *   confirm-subscription  confirm a pending SNS subscription (explicit only)
+ *
+ * check, scope and confirm-subscription are the same services Super Admin ›
+ * Entegrasyonlar › Amazon SES uses; here for diagnostics and break-glass.
  */
 final class EmailSesCommand extends Command
 {
@@ -33,29 +34,24 @@ final class EmailSesCommand extends Command
 
     protected $description = 'Amazon SES: read-only account check, report, warm-up plan, scopes';
 
-    public function handle(EmailProviderResolver $providers, EmailMetrics $metrics, WarmupPlanner $warmup, AuditLogger $audit): int
+    public function handle(SesAccountCheck $check, SesIntegrations $integrations, SnsSubscriptions $sns, EmailMetrics $metrics, WarmupPlanner $warmup): int
     {
         $actor = Actor::console('email:ses:'.$this->argument('action'));
 
-        return $this->inTenant(function () use ($providers, $metrics, $warmup, $audit, $actor) {
+        return $this->inTenant(function () use ($check, $integrations, $sns, $metrics, $warmup, $actor) {
             $integration = $this->emailIntegration('amazon_ses');
 
             switch ($this->argument('action')) {
                 case 'check':
                     $started = microtime(true);
-                    $provider = $providers->provider($integration, 'connection_test', $actor);
-                    $result = $provider->testConnection();
+                    $result = $check->run($integration, $actor);
                     if (! $result->ok) {
-                        $integration->forceFill(['status' => $result->errorCategory === 'auth' ? 'action_required' : 'error', 'last_error' => $result->errorMessage])->save();
                         $this->error("[{$result->errorCategory}] {$result->errorMessage}");
 
                         return self::FAILURE;
                     }
-                    $integration->forceFill(['status' => 'connected', 'last_error' => null, 'last_verified_at' => now(),
-                        'settings' => ['account' => $result->account] + (array) $integration->settings])->save();
-                    $audit->record(AuditAction::EmailAccountChecked, 'tenant_integration', $integration->id, array_intersect_key($result->account,
-                        array_flip(['region', 'production_access', 'sending_enabled', 'enforcement_status', 'max_24h_send', 'max_send_rate'])), $actor);
-                    $this->line(json_encode($result->account + ['duration_ms' => (int) ((microtime(true) - $started) * 1000)], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                    $this->line(json_encode($result->account + ['configuration_set' => $integration->settings['configuration_set_check']['state'] ?? null,
+                        'duration_ms' => (int) ((microtime(true) - $started) * 1000)], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
                     return self::SUCCESS;
 
@@ -78,24 +74,19 @@ final class EmailSesCommand extends Command
 
                         return self::INVALID;
                     }
-                    $scopes = array_values(array_unique($grant !== null ? [...(array) $integration->scopes, $grant] : array_diff((array) $integration->scopes, [$revoke])));
-                    $integration->forceFill(['scopes' => $scopes])->save();
-                    $audit->record(AuditAction::IntegrationScopeChanged, 'tenant_integration', $integration->id, ['granted' => $grant, 'revoked' => $revoke, 'scopes' => $scopes], $actor);
+                    $scopes = $integrations->setSendScope($integration, $grant !== null, $actor);
                     $this->info('Scopes: '.implode(', ', $scopes));
 
                     return self::SUCCESS;
 
                 case 'confirm-subscription':
-                    $pending = (array) ($integration->settings['sns_subscription'] ?? []);
-                    $item = isset($pending['inbox_id']) && ($pending['state'] ?? null) === 'pending_confirmation' ? WebhookInboxItem::query()->find($pending['inbox_id']) : null;
-                    $url = (string) ($item?->payload['SubscribeURL'] ?? '');
-                    if (! SesWebhookHandler::trustedSubscribeUrl($url)) {
-                        $this->error('No pending SNS subscription confirmation.');
+                    try {
+                        $sns->confirm($integration, $actor);
+                    } catch (SnsConfirmationFailed $e) {
+                        $this->error($e->reason === 'NO_PENDING_SUBSCRIPTION' ? 'No pending SNS subscription confirmation.' : "SNS subscription not confirmed ({$e->reason}).");
 
                         return self::FAILURE;
                     }
-                    Http::timeout(10)->get($url)->throw();
-                    $integration->forceFill(['settings' => ['sns_subscription' => ['state' => 'confirmed', 'at' => now()->toIso8601String()] + $pending] + (array) $integration->settings])->save();
                     $this->info('SNS subscription confirmed.');
 
                     return self::SUCCESS;

@@ -49,6 +49,26 @@ final class SesClient
     }
 
     /**
+     * GET /v2/email/configuration-sets/{name}.
+     *
+     * @return array<string, mixed>
+     */
+    public function getConfigurationSet(string $name): array
+    {
+        return $this->transport->request('get_configuration_set', 'GET', '/v2/email/configuration-sets/'.rawurlencode($name));
+    }
+
+    /**
+     * GET /v2/email/configuration-sets/{name}/event-destinations.
+     *
+     * @return array<string, mixed>
+     */
+    public function getConfigurationSetEventDestinations(string $name): array
+    {
+        return $this->transport->request('get_configuration_set_event_destinations', 'GET', '/v2/email/configuration-sets/'.rawurlencode($name).'/event-destinations');
+    }
+
+    /**
      * POST /v2/email/outbound-emails. Returns the SES MessageId.
      *
      * @param  array<string, mixed>  $payload

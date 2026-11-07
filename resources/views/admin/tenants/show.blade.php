@@ -134,12 +134,19 @@
     <p><a class="btn" href="{{ route('admin.tenants.ticimax', $t->id) }}#veri-senkronizasyonu">Veri senkronizasyonu</a></p>
 </div>
 @endif
+@if ($ses !== null)
+@php($sesBadge = ['not_configured' => 'b-muted', 'awaiting_test' => 'b-muted', 'action_required' => 'b-bad', 'incomplete' => 'b-warn', 'infrastructure_ready' => 'b-ok', 'ready' => 'b-ok'][$ses['overall']] ?? 'b-muted')
+<div class="card" id="ses-hazirlik"><h2>E-posta / SES Hazırlık <span class="badge {{ $sesBadge }}">{{ $ses['overall_label'] }}</span></h2>
+    @include('admin.tenants._ses_readiness', ['readiness' => $ses])
+    <p><a class="btn" href="{{ route('admin.tenants.ses', $t->id) }}">Amazon SES</a></p>
+</div>
+@endif
 <div class="card table-wrap"><h2>Entegrasyonlar</h2>
     <p class="muted">Yalnız durum gösterilir; secret, anahtar veya ayar değeri bu alanda hiçbir zaman gösterilmez.</p>
 <table>
     <thead><tr><th>Entegrasyon</th><th>Durum</th><th>Son doğrulama</th></tr></thead>
     <tbody>@foreach ($integrations as $provider => $i)
-        <tr><td>@if ($provider === 'iys')<a href="{{ route('admin.tenants.via', $t->id) }}">{{ $i['label'] }}</a>@elseif ($provider === 'ticimax')<a href="{{ route('admin.tenants.ticimax', $t->id) }}">{{ $i['label'] }}</a>@else{{ $i['label'] }}@endif</td><td>@include('admin.tenants._state', ['state' => $i['state']])</td>
+        <tr><td>@if ($provider === 'iys')<a href="{{ route('admin.tenants.via', $t->id) }}">{{ $i['label'] }}</a>@elseif ($provider === 'ticimax')<a href="{{ route('admin.tenants.ticimax', $t->id) }}">{{ $i['label'] }}</a>@elseif ($provider === 'amazon_ses')<a href="{{ route('admin.tenants.ses', $t->id) }}">{{ $i['label'] }}</a>@else{{ $i['label'] }}@endif</td><td>@include('admin.tenants._state', ['state' => $i['state']])</td>
             <td class="muted">{{ $i['last_verified_at'] ? \Illuminate\Support\Carbon::parse($i['last_verified_at'])->format('d.m.Y H:i') : '—' }}</td></tr>
     @endforeach</tbody>
 </table>

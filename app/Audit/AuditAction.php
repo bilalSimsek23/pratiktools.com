@@ -64,6 +64,9 @@ enum AuditAction: string
     case EmailDeferred = 'email.deferred';
     case EmailFailed = 'email.failed';
     case EmailAccountChecked = 'email.account_checked';
+    case EmailSnsSubscriptionConfirmed = 'email.sns_subscription_confirmed';
+    case EmailSnsSubscriptionFailed = 'email.sns_subscription_failed';
+    case EmailTestRequested = 'email.test_requested';
     case EmailUnsubscribed = 'email.unsubscribed';
     case EmailTemplateVersionCreated = 'email.template_version_created';
     case EmailAudienceSnapshotCreated = 'email.audience_snapshot_created';

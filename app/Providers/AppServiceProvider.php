@@ -123,6 +123,20 @@ class AppServiceProvider extends ServiceProvider
         ]);
 
         // Super Admin activation links: per IP, both opening and submitting.
+        // Super Admin › Amazon SES: each action has its own budget per admin
+        // (a plain throttle:N,M shares one counter across every route).
+        RateLimiter::for('admin-ses', function (Request $request) {
+            $action = (string) $request->route()?->getName();
+            $by = 'admin-ses:'.$request->user('platform')?->getAuthIdentifier().':'.$action.':'.$request->route('tenant');
+
+            return match ($action) {
+                'admin.tenants.ses.test', 'admin.tenants.ses.scope' => Limit::perMinute(6)->by($by),
+                'admin.tenants.ses.sns.confirm' => Limit::perMinute(3)->by($by),
+                'admin.tenants.ses.senders.refresh', 'admin.tenants.ses.test-recipients.store', 'admin.tenants.ses.test-recipients.remove' => Limit::perMinute(10)->by($by),
+                'admin.tenants.ses.test-email' => Limit::perMinutes(10, 3)->by($by),
+                default => Limit::perMinute(20)->by($by),
+            };
+        });
         RateLimiter::for('admin-activation', fn (Request $request) => Limit::perMinute(10)->by('admin-activation:'.$request->ip()));
 
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(240)->by(

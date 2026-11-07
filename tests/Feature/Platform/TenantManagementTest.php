@@ -119,9 +119,9 @@ final class TenantManagementTest extends TestCase
         foreach (['Ticimax bağlantısı', 'İYS / ViA yapılandırması', 'E-posta gönderimi (Amazon SES)', 'Push bildirimleri (OneSignal)'] as $label) {
             $detail->assertSee($label);
         }
-        // Four integration rows plus the Ticimax Hazırlık summary.
-        $this->assertSame(5, substr_count((string) $detail->getContent(), 'Yapılandırılmadı'));
-        $detail->assertSee('Ticimax Hazırlık')->assertSee('Ticimax entegrasyonu yapılandırılmadı.');
+        // Four integration rows plus the Ticimax and E-posta / SES Hazırlık summaries.
+        $this->assertSame(6, substr_count((string) $detail->getContent(), 'Yapılandırılmadı'));
+        $detail->assertSee('Ticimax Hazırlık')->assertSee('Ticimax entegrasyonu yapılandırılmadı.')->assertSee('E-posta / SES Hazırlık');
         $this->assertSame(0, DB::connection('pgsql_platform')->table('tenant_users')->where('tenant_id', $t->id)->where('status', 'active')->count(), 'The admin is never a member.');
     }
 

@@ -59,7 +59,7 @@ final class PlatformTenants
             return null;
         }
         $t = $this->db()->table('tenants')->where('id', $id)
-            ->first(['id', 'name', 'slug', 'status', 'country', 'timezone', 'currency', 'locale', 'contact_phone', 'plan', 'suspended_at', 'suspension_reason', 'created_at']);
+            ->first(['id', 'public_id', 'name', 'slug', 'status', 'country', 'timezone', 'currency', 'locale', 'contact_phone', 'plan', 'suspended_at', 'suspension_reason', 'created_at']);
         if ($t === null) {
             return null;
         }

@@ -9,6 +9,7 @@ use App\Platform\PlatformTenantNotes;
 use App\Platform\PlatformTenants;
 use App\Platform\TenantLifecycle;
 use App\Platform\TenantMetadata;
+use App\Platform\TenantSes;
 use App\Platform\TenantTicimax;
 use App\Tenancy\ProvisioningError;
 use App\Tenancy\TenantProvisioner;
@@ -78,14 +79,14 @@ final class TenantController extends Controller
             : $to->with('status', 'Bu müşteri bu owner ile zaten oluşturulmuş; hiçbir şey değiştirilmedi.');
     }
 
-    public function show(Request $request, string $tenant, PlatformTenants $tenants, TenantTicimax $ticimax): View
+    public function show(Request $request, string $tenant, PlatformTenants $tenants, TenantTicimax $ticimax, TenantSes $ses): View
     {
         $t = $tenants->find($tenant) ?? abort(404);
         $tab = array_key_exists((string) $request->query('tab'), self::TABS) ? (string) $request->query('tab') : 'genel';
 
         return view('admin.tenants.show', ['t' => $t, 'tab' => $tab, 'tabs' => self::TABS, 'members' => $tenants->members($t->id), 'integrations' => $tenants->integrations($t->id),
             'usage' => $tenants->usage($t->id), 'audit' => $tab === 'audit' ? $tenants->audit($t->id) : collect(), 'roles' => TenantRole::cases(),
-            'ticimax' => $tab === 'entegrasyonlar' ? $ticimax->readiness($t->id) : null]);
+            'ticimax' => $tab === 'entegrasyonlar' ? $ticimax->readiness($t->id) : null, 'ses' => $tab === 'entegrasyonlar' ? $ses->readiness($t->id) : null]);
     }
 
     public function status(Request $request, string $tenant, PlatformTenants $tenants, TenantLifecycle $lifecycle): RedirectResponse

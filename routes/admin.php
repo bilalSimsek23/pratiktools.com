@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\RequestDiagnosticsController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Admin\TenantController;
 use App\Http\Controllers\Admin\TenantMemberController;
+use App\Http\Controllers\Admin\TenantSesController;
 use App\Http\Controllers\Admin\TenantTicimaxController;
 use App\Http\Controllers\Admin\TenantViaController;
 use App\Http\Controllers\Admin\TwoFactorController;
@@ -51,6 +52,7 @@ Route::name('admin.')->group(function () {
             Route::get('tenants/{tenant}', [TenantController::class, 'show'])->whereUuid('tenant')->name('tenants.show');
             Route::get('tenants/{tenant}/integrations/via', [TenantViaController::class, 'show'])->whereUuid('tenant')->name('tenants.via');
             Route::get('tenants/{tenant}/integrations/ticimax', [TenantTicimaxController::class, 'show'])->whereUuid('tenant')->name('tenants.ticimax');
+            Route::get('tenants/{tenant}/integrations/ses', [TenantSesController::class, 'show'])->whereUuid('tenant')->name('tenants.ses');
             Route::middleware(PlatformRecentAuth::class)->group(function () {
                 Route::post('tenants', [TenantController::class, 'store'])->middleware('throttle:20,1')->name('tenants.store');
                 Route::post('tenants/{tenant}/status', [TenantController::class, 'status'])->whereUuid('tenant')->name('tenants.status');
@@ -63,6 +65,17 @@ Route::name('admin.')->group(function () {
                 Route::post('tenants/{tenant}/integrations/ticimax/onboarding', [TenantTicimaxController::class, 'onboarding'])->whereUuid('tenant')->middleware('throttle:20,1')->name('tenants.ticimax.onboarding');
                 Route::post('tenants/{tenant}/integrations/ticimax/sync/{step}', [TenantTicimaxController::class, 'sync'])->whereUuid('tenant')
                     ->whereIn('step', ['categories', 'products', 'customers', 'orders', 'carts', 'consent_build', 'ticimax_history'])->middleware('throttle:20,1')->name('tenants.ticimax.sync');
+                Route::prefix('tenants/{tenant}/integrations/ses')->whereUuid('tenant')->name('tenants.ses.')->controller(TenantSesController::class)->middleware('throttle:admin-ses')->group(function () {
+                    Route::post('/', 'update')->name('update');
+                    Route::post('test', 'test')->name('test');
+                    Route::post('senders', 'storeSender')->name('senders.store');
+                    Route::post('senders/{sender}/refresh', 'refreshSender')->whereUuid('sender')->name('senders.refresh');
+                    Route::post('sns/confirm', 'confirmSubscription')->name('sns.confirm');
+                    Route::post('scope', 'scope')->name('scope');
+                    Route::post('test-recipients', 'addTestRecipient')->name('test-recipients.store');
+                    Route::post('test-recipients/remove', 'removeTestRecipient')->name('test-recipients.remove');
+                    Route::post('test-email', 'sendTest')->name('test-email');
+                });
                 Route::post('tenants/{tenant}/members', [TenantMemberController::class, 'store'])->whereUuid('tenant')->middleware('throttle:30,1')->name('tenants.members.store');
                 Route::post('tenants/{tenant}/members/{member}/role', [TenantMemberController::class, 'role'])->whereUuid(['tenant', 'member'])->name('tenants.members.role');
                 Route::post('tenants/{tenant}/members/{member}/status', [TenantMemberController::class, 'status'])->whereUuid(['tenant', 'member'])->name('tenants.members.status');
