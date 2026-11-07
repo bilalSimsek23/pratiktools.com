@@ -7,7 +7,9 @@ use App\Commerce\CommerceSourceFactory;
 use App\Commerce\Contracts\CommerceSource;
 use App\Commerce\Data\RecordPage;
 use App\Commerce\Data\SyncWindow;
+use App\Consent\Sync\SyncTracker;
 use App\Integrations\Errors\ProviderError;
+use App\Integrations\Errors\TransientFailure;
 use App\Models\IntegrationError;
 use App\Models\IntegrationSyncRun;
 use App\Models\TenantIntegration;
@@ -29,7 +31,11 @@ use Throwable;
  *   it stopped. Re-reading a page is harmless: every write is idempotent.
  * - The cursor moves only when the whole window was stored, and never
  *   backwards. A failed run leaves the cursor alone; the next run re-reads
- *   the same window.
+ *   the same window, unless it can resume (see openRun).
+ * - A queued run (deferTransient) does not fail on a transient error (a
+ *   dropped Redis or database connection, a provider timeout): it stays
+ *   "running" at its saved page, marked retryable, and its job tries again
+ *   with backoff (SyncCommerceEntity).
  */
 final class SyncRunner
 {
@@ -41,6 +47,7 @@ final class SyncRunner
         private readonly OrderUpserter $orders,
         private readonly CartUpserter $carts,
         private readonly CustomerStatsBuilder $stats,
+        private readonly SyncTracker $tracker,
     ) {}
 
     /**
@@ -50,7 +57,7 @@ final class SyncRunner
      * $lookbackDays widens a delta window (reconciliation re-reads recent
      * days to catch changes a delta filter may have missed).
      */
-    public function run(TenantIntegration $integration, SyncEntity $entity, SyncMode $mode, ?float $sliceSeconds = null, ?Actor $actor = null, ?int $lookbackDays = null): IntegrationSyncRun
+    public function run(TenantIntegration $integration, SyncEntity $entity, SyncMode $mode, ?float $sliceSeconds = null, ?Actor $actor = null, ?int $lookbackDays = null, bool $deferTransient = false): IntegrationSyncRun
     {
         $this->context->requireTenant();
         $run = $this->openRun($integration, $entity, $mode, $lookbackDays);
@@ -77,7 +84,7 @@ final class SyncRunner
                     'records_updated' => $run->records_updated + $result->updated,
                     'records_skipped' => $run->records_skipped + $result->skipped,
                     'api_calls' => $run->api_calls + $page->apiCalls,
-                ])->save();
+                ] + SyncTracker::clearedDeferral($run))->save();
 
                 if ($page->nextPageToken === null) {
                     return $this->succeed($run, $integration, $entity);
@@ -90,7 +97,7 @@ final class SyncRunner
                 }
             }
         } catch (Throwable $e) {
-            return $this->fail($run, $integration, $e);
+            return $deferTransient && TransientFailure::is($e) ? $this->tracker->defer($run, $integration, $e) : $this->fail($run, $integration, $e);
         }
     }
 
@@ -121,6 +128,10 @@ final class SyncRunner
 
         if ($running !== null) {
             return $running;
+        }
+
+        if (($resumed = $this->resume($integration, $entity, $mode)) !== null) {
+            return $resumed;
         }
 
         $cursor = DB::table('integration_sync_cursors')
@@ -168,6 +179,37 @@ final class SyncRunner
                 ->where('entity', $entity->value)
                 ->where('status', 'running')
                 ->firstOrFail();
+        }
+    }
+
+    /**
+     * A run that failed part-way (its retries used up, or a permanent error
+     * that was fixed since) continues at its last saved page instead of
+     * reading everything again: a new run with the same window, mode and
+     * page token. Only recent failures resume; the window would be stale.
+     */
+    private function resume(TenantIntegration $integration, SyncEntity $entity, SyncMode $mode): ?IntegrationSyncRun
+    {
+        $last = IntegrationSyncRun::query()->where('integration_id', $integration->id)->where('entity', $entity->value)->orderByDesc('started_at')->first();
+        if ($last === null || $last->status !== 'failed' || $last->page_token === null || $last->finished_at === null
+            || CarbonImmutable::parse($last->finished_at)->lt(now()->subHours((int) config('commerce.sync.resume_hours')))
+            || ($mode === SyncMode::Full && $last->mode !== SyncMode::Full->value)) {
+            return null;
+        }
+
+        try {
+            return IntegrationSyncRun::query()->create([
+                'integration_id' => $integration->id,
+                'entity' => $entity->value,
+                'mode' => $last->mode,
+                'status' => 'running',
+                'window_start' => $last->window_start,
+                'window_end' => $last->window_end,
+                'page_token' => $last->page_token,
+                'started_at' => now(),
+            ])->refresh();
+        } catch (UniqueConstraintViolationException) {
+            return IntegrationSyncRun::query()->where('integration_id', $integration->id)->where('entity', $entity->value)->where('status', 'running')->firstOrFail();
         }
     }
 

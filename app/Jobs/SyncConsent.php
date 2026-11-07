@@ -8,6 +8,7 @@ use App\Models\IntegrationSyncRun;
 use App\Models\TenantIntegration;
 use App\Queue\Middleware\SetTenantContext;
 use App\Queue\TenantAwareJob;
+use App\Queue\TransientRetry;
 use App\Tenancy\TenantContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -19,15 +20,27 @@ use Throwable;
 
 /**
  * One read-only consent sync step on the "sync" queue. The bulk status
- * sync works in slices and re-queues itself.
+ * sync, the recipient build (consent_build, on the commerce integration)
+ * and the Ticimax history work in slices and re-queue themselves.
+ *
+ * The build and the history defer transient errors and try again with
+ * backoff (TransientRetry). Started by the Ticimax onboarding, a successful
+ * run hands over to the next onboarding step.
  */
 final class SyncConsent implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, TenantAwareJob;
 
-    public const KINDS = ['iys_status', 'iys_changes', 'iys_resolve', 'ticimax_history'];
+    public const KINDS = ['iys_status', 'iys_changes', 'iys_resolve', 'ticimax_history', 'consent_build'];
 
     public int $tries = 1;
+
+    /**
+     * The unique lock expires, so a job lost from the queue (flushed Redis)
+     * never blocks starting the same sync again. Overlap is still prevented
+     * by the run itself (one running run per entity) and its lock.
+     */
+    public int $uniqueFor = 3600;
 
     /**
      * Every kind works in slices of commerce.sync.slice_seconds (plus one
@@ -40,6 +53,8 @@ final class SyncConsent implements ShouldBeUniqueUntilProcessing, ShouldQueue
         public readonly string $integrationId,
         public readonly string $kind,
         ?string $tenantId = null,
+        public readonly bool $onboarding = false,
+        public readonly int $retry = 0,
     ) {
         if (! in_array($kind, self::KINDS, true)) {
             throw new \InvalidArgumentException("Unknown consent sync [{$kind}].");
@@ -65,14 +80,27 @@ final class SyncConsent implements ShouldBeUniqueUntilProcessing, ShouldQueue
             'iys_status' => $sync->iysStatus($integration, $slice),
             'iys_changes' => tap($sync->iysChanges($integration, 'citizen'), fn () => $sync->iysChanges($integration, 'provider')),
             'iys_resolve' => $sync->iysResolve($integration, sliceSeconds: $slice),
-            'ticimax_history' => $sync->ticimaxHistory($integration, sliceSeconds: $slice),
+            'ticimax_history' => $sync->ticimaxHistory($integration, sliceSeconds: $slice, deferTransient: true),
+            'consent_build' => $sync->buildRun($integration, $slice, deferTransient: true),
             default => throw new \InvalidArgumentException("Unknown consent sync [{$this->kind}]."),
         };
 
-        if ($run->status === 'running') {
+        if (TransientRetry::deferred($run)) {
+            $delay = TransientRetry::delay($this->retry);
+            $delay === null
+                ? app(SyncTracker::class)->fail($run, $integration, TransientRetry::exhausted($run, $this->retry))
+                : $this->continue($this->retry + 1, $delay);
+        } elseif ($run->status === 'running') {
             // Delayed so this job's overlap lock is released first.
-            self::dispatch($this->integrationId, $this->kind, $this->tenantId)->delay(now()->addSeconds(5));
+            $this->continue(0, 5);
+        } elseif ($run->status === 'succeeded' && $this->onboarding) {
+            AdvanceTicimaxOnboarding::dispatch($this->integrationId, $this->tenantId);
         }
+    }
+
+    private function continue(int $retry, int $delaySeconds): void
+    {
+        self::dispatch($this->integrationId, $this->kind, $this->tenantId, $this->onboarding, $retry)->delay(now()->addSeconds($delaySeconds));
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Consent\Sync;
 
 use App\Integrations\Errors\ProviderError;
+use App\Integrations\Errors\TransientFailure;
 use App\Models\IntegrationError;
 use App\Models\IntegrationSyncRun;
 use App\Models\TenantIntegration;
@@ -54,7 +55,41 @@ final class SyncTracker
             'records_updated' => $run->records_updated + ($counts['updated'] ?? 0),
             'records_skipped' => $run->records_skipped + ($counts['skipped'] ?? 0),
             'api_calls' => $run->api_calls + ($counts['api_calls'] ?? 0),
-        ])->save();
+        ] + self::clearedDeferral($run))->save();
+    }
+
+    /**
+     * A page went through after a deferred attempt: the run is healthy again.
+     *
+     * @return array<string, null>
+     */
+    public static function clearedDeferral(IntegrationSyncRun $run): array
+    {
+        return $run->error_category === null ? [] : ['error_category' => null, 'error_message' => null];
+    }
+
+    /**
+     * A transient failure of a queued run: the run stays "running" at its
+     * saved page (nothing is lost or read twice into the cursor) and is
+     * marked retryable, so its job tries again later. The job gives up after
+     * a bounded number of attempts and then fails the run.
+     */
+    public function defer(IntegrationSyncRun $run, TenantIntegration $integration, Throwable $e): IntegrationSyncRun
+    {
+        $reason = TransientFailure::reason($e);
+
+        DB::transaction(function () use ($run, $integration, $reason, $e) {
+            $run->forceFill(['errors' => $run->errors + 1, 'error_category' => ProviderError::RETRYABLE, 'error_message' => $reason])->save();
+            $this->note($integration, $run, ProviderError::RETRYABLE, $e instanceof ProviderError ? (string) $e->operation : 'sync', $reason,
+                ['entity' => $run->entity, 'mode' => $run->mode, 'page_token' => $run->page_token, 'deferred' => true]);
+        });
+
+        Log::warning('sync.deferred', [
+            'run_id' => $run->id, 'entity' => $run->entity, 'errors' => $run->errors,
+            'error_class' => $e::class, 'error_at' => basename($e->getFile()).':'.$e->getLine(),
+        ]);
+
+        return $run;
     }
 
     public function cursor(TenantIntegration $integration, string $entity): ?object

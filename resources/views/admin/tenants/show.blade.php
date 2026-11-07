@@ -121,6 +121,19 @@
 @endif
 
 @if ($tab === 'entegrasyonlar')
+@if ($ticimax !== null)
+@php($ready = ['ready' => 'b-ok', 'syncing' => 'b-warn', 'action_required' => 'b-bad'][$ticimax['overall']] ?? 'b-muted')
+<div class="card" id="ticimax-hazirlik"><h2>Ticimax Hazırlık <span class="badge {{ $ready }}">{{ \App\Commerce\Onboarding\TicimaxOnboarding::OVERALL[$ticimax['overall']] }}</span></h2>
+    @if ($ticimax['steps'] === [])
+        <p class="muted">Ticimax entegrasyonu yapılandırılmadı.</p>
+    @else
+        <ul class="list-plain">@foreach ($ticimax['steps'] as $s)
+            <li class="split"><span>{{ $s['label'] }}</span><span>{{ $s['done'] ? '✅' : (in_array($s['state'], ['failed'], true) ? '❌' : ($s['busy'] ? '⏳' : '—')) }}</span></li>
+        @endforeach</ul>
+    @endif
+    <p><a class="btn" href="{{ route('admin.tenants.ticimax', $t->id) }}#veri-senkronizasyonu">Veri senkronizasyonu</a></p>
+</div>
+@endif
 <div class="card table-wrap"><h2>Entegrasyonlar</h2>
     <p class="muted">Yalnız durum gösterilir; secret, anahtar veya ayar değeri bu alanda hiçbir zaman gösterilmez.</p>
 <table>

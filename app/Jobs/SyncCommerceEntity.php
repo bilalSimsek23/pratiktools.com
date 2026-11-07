@@ -8,6 +8,7 @@ use App\Commerce\Sync\SyncRunner;
 use App\Models\TenantIntegration;
 use App\Queue\Middleware\SetTenantContext;
 use App\Queue\TenantAwareJob;
+use App\Queue\TransientRetry;
 use App\Tenancy\TenantContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -21,12 +22,25 @@ use Throwable;
  * One time slice of an entity sync. When the slice ends before the window
  * is complete, the job queues its continuation at the back of the "sync"
  * queue, so one large tenant never blocks the others.
+ *
+ * A transient error (dropped Redis or database connection, provider
+ * timeout) leaves the run at its saved page; the job tries again after
+ * commerce.sync.retry_backoff_seconds and fails the run when they are used
+ * up. Started by the Ticimax onboarding ($onboarding), a successful run
+ * hands over to the next onboarding step.
  */
 final class SyncCommerceEntity implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, TenantAwareJob;
 
     public int $tries = 1;
+
+    /**
+     * The unique lock expires, so a job lost from the queue (flushed Redis)
+     * never blocks starting the same sync again. Overlap is still prevented
+     * by the run itself (one running run per entity) and its lock.
+     */
+    public int $uniqueFor = 3600;
 
     /**
      * A slice works for commerce.sync.slice_seconds plus one page; this
@@ -40,6 +54,8 @@ final class SyncCommerceEntity implements ShouldBeUniqueUntilProcessing, ShouldQ
         public readonly SyncMode $mode = SyncMode::Delta,
         ?string $tenantId = null,
         public readonly ?int $lookbackDays = null,
+        public readonly bool $onboarding = false,
+        public readonly int $retry = 0,
     ) {
         $this->forTenant($tenantId);
         $this->onQueue('sync');
@@ -59,12 +75,24 @@ final class SyncCommerceEntity implements ShouldBeUniqueUntilProcessing, ShouldQ
             return;
         }
 
-        $run = $runner->run($integration, $this->entity, $this->mode, (float) config('commerce.sync.slice_seconds'), lookbackDays: $this->lookbackDays);
+        $run = $runner->run($integration, $this->entity, $this->mode, (float) config('commerce.sync.slice_seconds'), lookbackDays: $this->lookbackDays, deferTransient: true);
 
-        if ($run->status === 'running') {
+        if (TransientRetry::deferred($run)) {
+            $delay = TransientRetry::delay($this->retry);
+            $delay === null
+                ? $runner->abandon($integration, $this->entity, TransientRetry::exhausted($run, $this->retry))
+                : $this->continue($this->retry + 1, $delay);
+        } elseif ($run->status === 'running') {
             // Delayed so this job's overlap lock is released first.
-            self::dispatch($this->integrationId, $this->entity, $this->mode, $this->tenantId, $this->lookbackDays)->delay(now()->addSeconds(5));
+            $this->continue(0, 5);
+        } elseif ($run->status === 'succeeded' && $this->onboarding) {
+            AdvanceTicimaxOnboarding::dispatch($this->integrationId, $this->tenantId);
         }
+    }
+
+    private function continue(int $retry, int $delaySeconds): void
+    {
+        self::dispatch($this->integrationId, $this->entity, $this->mode, $this->tenantId, $this->lookbackDays, $this->onboarding, $retry)->delay(now()->addSeconds($delaySeconds));
     }
 
     /**

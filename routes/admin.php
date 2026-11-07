@@ -60,6 +60,9 @@ Route::name('admin.')->group(function () {
                 Route::post('tenants/{tenant}/integrations/via/status', [TenantViaController::class, 'status'])->whereUuid('tenant')->name('tenants.via.status');
                 Route::post('tenants/{tenant}/integrations/ticimax', [TenantTicimaxController::class, 'update'])->whereUuid('tenant')->middleware('throttle:20,1')->name('tenants.ticimax.update');
                 Route::post('tenants/{tenant}/integrations/ticimax/test', [TenantTicimaxController::class, 'test'])->whereUuid('tenant')->middleware('throttle:6,1')->name('tenants.ticimax.test');
+                Route::post('tenants/{tenant}/integrations/ticimax/onboarding', [TenantTicimaxController::class, 'onboarding'])->whereUuid('tenant')->middleware('throttle:20,1')->name('tenants.ticimax.onboarding');
+                Route::post('tenants/{tenant}/integrations/ticimax/sync/{step}', [TenantTicimaxController::class, 'sync'])->whereUuid('tenant')
+                    ->whereIn('step', ['categories', 'products', 'customers', 'orders', 'carts', 'consent_build', 'ticimax_history'])->middleware('throttle:20,1')->name('tenants.ticimax.sync');
                 Route::post('tenants/{tenant}/members', [TenantMemberController::class, 'store'])->whereUuid('tenant')->middleware('throttle:30,1')->name('tenants.members.store');
                 Route::post('tenants/{tenant}/members/{member}/role', [TenantMemberController::class, 'role'])->whereUuid(['tenant', 'member'])->name('tenants.members.role');
                 Route::post('tenants/{tenant}/members/{member}/status', [TenantMemberController::class, 'status'])->whereUuid(['tenant', 'member'])->name('tenants.members.status');

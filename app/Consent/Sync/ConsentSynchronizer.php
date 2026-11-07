@@ -16,6 +16,7 @@ use App\Consent\Data\ProviderConsent;
 use App\Consent\RecipientDirectory;
 use App\Consent\RecipientType;
 use App\Integrations\Errors\ProviderError;
+use App\Integrations\Errors\TransientFailure;
 use App\Models\IntegrationSyncRun;
 use App\Models\TenantIntegration;
 use App\Tenancy\TenantContext;
@@ -30,6 +31,10 @@ use Throwable;
 final class ConsentSynchronizer
 {
     public const ENTITY_TICIMAX_HISTORY = 'ticimax_consent_history';
+
+    public const ENTITY_CONSENT_BUILD = 'consent_build';
+
+    private const FIRST_ID = '00000000-0000-0000-0000-000000000000';
 
     public const ENTITY_IYS_STATUS = 'iys_status_email';
 
@@ -55,45 +60,17 @@ final class ConsentSynchronizer
      */
     public function buildFromCustomers(int $chunk = 2000): array
     {
-        $tenantId = $this->context->requireTenant();
-        $after = '00000000-0000-0000-0000-000000000000';
+        $after = self::FIRST_ID;
         $customers = 0;
+        do {
+            [$count, $after] = $this->buildChunk($after, $chunk);
+            $customers += $count;
+        } while ($count > 0);
 
-        while (true) {
-            $rows = DB::table('customers')->where('tenant_id', $tenantId)->where('id', '>', $after)->orderBy('id')->limit($chunk)
-                ->get(['id', 'email', 'phone']);
-            if ($rows->isEmpty()) {
-                break;
-            }
-            $after = (string) $rows->last()->id;
-            $customers += $rows->count();
-
-            DB::transaction(function () use ($rows) {
-                $emails = [];
-                $phones = [];
-                foreach ($rows as $c) {
-                    if (($e = $this->recipients->email($c->email)) !== null) {
-                        $emails[$c->id] = $e;
-                    }
-                    if (($p = $this->recipients->phone($c->phone)) !== null) {
-                        $phones[$c->id] = $p;
-                    }
-                }
-
-                $links = [];
-                $emailIds = $this->recipients->ensure('email', array_values($emails));
-                foreach ($emails as $customerId => $e) {
-                    $links[] = ['recipient_id' => $emailIds[$e['address']], 'customer_id' => $customerId, 'link_source' => 'customer_email'];
-                }
-                $phoneIds = $this->recipients->ensure('phone', array_values($phones));
-                foreach ($phones as $customerId => $p) {
-                    $links[] = ['recipient_id' => $phoneIds[$p['address']], 'customer_id' => $customerId, 'link_source' => 'customer_phone'];
-                }
-                $this->recipients->link($links);
-            });
+        $observations = 0;
+        foreach (array_keys($this->storeConsentSpecs()) as $spec) {
+            $observations += $this->snapshotStoreConsent($spec);
         }
-
-        $observations = $this->snapshotStoreConsent();
 
         return [
             'customers' => $customers,
@@ -104,42 +81,132 @@ final class ConsentSynchronizer
     }
 
     /**
-     * Store flags per recipient. An address shared by several members is
-     * GRANTED only if every member with a flag says yes; any "no" wins.
+     * buildFromCustomers (consent:build --skip-history) as a tracked run on
+     * the commerce integration (entity consent_build), so the panel can
+     * start it on the queue and follow it. It works in slices and resumes
+     * at its page token: "customers:<last id>", then "snapshot:<n>". Every
+     * write is idempotent, so a repeated chunk changes nothing.
      */
-    private function snapshotStoreConsent(): int
+    public function buildRun(TenantIntegration $commerce, ?float $sliceSeconds = null, bool $deferTransient = false, int $chunk = 2000): IntegrationSyncRun
+    {
+        $started = microtime(true);
+        $run = $this->tracker->open($commerce, self::ENTITY_CONSENT_BUILD, 'full');
+        $sliceUsed = fn () => $sliceSeconds !== null && microtime(true) - $started >= $sliceSeconds;
+
+        try {
+            $token = $run->page_token ?? 'customers:'.self::FIRST_ID;
+            while (str_starts_with($token, 'customers:')) {
+                [$count, $after] = $this->buildChunk(substr($token, strlen('customers:')), $chunk);
+                $token = $count === 0 ? 'snapshot:0' : "customers:{$after}";
+                $this->tracker->progress($run, ['read' => $count], $token);
+                if ($sliceUsed()) {
+                    $run->forceFill(['slices' => $run->slices + 1])->save();
+
+                    return $run;
+                }
+            }
+
+            $specs = count($this->storeConsentSpecs());
+            for ($spec = (int) substr($token, strlen('snapshot:')); $spec < $specs; $spec++) {
+                $observed = $this->snapshotStoreConsent($spec);
+                $this->tracker->progress($run, ['updated' => $observed], 'snapshot:'.($spec + 1));
+                if ($spec + 1 < $specs && $sliceUsed()) {
+                    $run->forceFill(['slices' => $run->slices + 1])->save();
+
+                    return $run;
+                }
+            }
+
+            return $this->tracker->succeed($run, $commerce, full: true);
+        } catch (Throwable $e) {
+            return $deferTransient && TransientFailure::is($e) ? $this->tracker->defer($run, $commerce, $e) : $this->tracker->fail($run, $commerce, $e);
+        }
+    }
+
+    /**
+     * Recipients and customer links for up to $chunk customers after $after.
+     *
+     * @return array{0: int, 1: string} customers processed, last customer id
+     */
+    private function buildChunk(string $after, int $chunk): array
+    {
+        $tenantId = $this->context->requireTenant();
+        $rows = DB::table('customers')->where('tenant_id', $tenantId)->where('id', '>', $after)->orderBy('id')->limit($chunk)
+            ->get(['id', 'email', 'phone']);
+        if ($rows->isEmpty()) {
+            return [0, $after];
+        }
+
+        DB::transaction(function () use ($rows) {
+            $emails = [];
+            $phones = [];
+            foreach ($rows as $c) {
+                if (($e = $this->recipients->email($c->email)) !== null) {
+                    $emails[$c->id] = $e;
+                }
+                if (($p = $this->recipients->phone($c->phone)) !== null) {
+                    $phones[$c->id] = $p;
+                }
+            }
+
+            $links = [];
+            $emailIds = $this->recipients->ensure('email', array_values($emails));
+            foreach ($emails as $customerId => $e) {
+                $links[] = ['recipient_id' => $emailIds[$e['address']], 'customer_id' => $customerId, 'link_source' => 'customer_email'];
+            }
+            $phoneIds = $this->recipients->ensure('phone', array_values($phones));
+            foreach ($phones as $customerId => $p) {
+                $links[] = ['recipient_id' => $phoneIds[$p['address']], 'customer_id' => $customerId, 'link_source' => 'customer_phone'];
+            }
+            $this->recipients->link($links);
+        });
+
+        return [$rows->count(), (string) $rows->last()->id];
+    }
+
+    /**
+     * Store flags per recipient for one spec of storeConsentSpecs(). An
+     * address shared by several members is GRANTED only if every member with
+     * a flag says yes; any "no" wins.
+     */
+    private function snapshotStoreConsent(int $spec): int
     {
         $count = 0;
-        $specs = [
+        [$channel, $provider, $type, $flag, $date] = $this->storeConsentSpecs()[$spec];
+        $rows = DB::cursor(
+            "SELECT r.id AS recipient_id, bool_and(({$flag})::boolean) AS all_yes, bool_or(({$flag})::boolean) AS any_yes,
+                    count(*) AS members, max(({$date})::timestamptz) AS changed_at
+             FROM consent_recipients r
+             JOIN recipient_customers rc ON rc.recipient_id = r.id AND rc.tenant_id = r.tenant_id
+             JOIN customers c ON c.id = rc.customer_id AND c.tenant_id = rc.tenant_id
+             WHERE r.tenant_id = ? AND r.address_type = ? AND ({$flag}) IS NOT NULL
+             GROUP BY r.id",
+            [$this->context->requireTenant(), $type],
+        );
+
+        $batch = [];
+        foreach ($rows as $row) {
+            $batch[] = $row;
+            if (count($batch) === 1000) {
+                $count += $this->observeSnapshot($batch, $channel, $provider);
+                $batch = [];
+            }
+        }
+        $count += $this->observeSnapshot($batch, $channel, $provider);
+
+        return $count;
+    }
+
+    /**
+     * @return list<array{0: ConsentChannel, 1: ConsentSourceProvider, 2: string, 3: string, 4: string}>
+     */
+    private function storeConsentSpecs(): array
+    {
+        return [
             [ConsentChannel::Email, ConsentSourceProvider::Ticimax, 'email', "c.source_consent->>'email_opt_in'", "c.source_consent->>'permission_updated_at'"],
             [ConsentChannel::Sms, ConsentSourceProvider::Ticimax, 'phone', "c.source_consent->>'sms_opt_in'", "c.source_consent->>'permission_updated_at'"],
             [ConsentChannel::Email, ConsentSourceProvider::TicimaxNewsletter, 'email', "c.source_consent->'newsletter'->>'email_opt_in'", "c.source_consent->'newsletter'->>'subscribed_at'"],
         ];
-
-        foreach ($specs as [$channel, $provider, $type, $flag, $date]) {
-            $rows = DB::cursor(
-                "SELECT r.id AS recipient_id, bool_and(({$flag})::boolean) AS all_yes, bool_or(({$flag})::boolean) AS any_yes,
-                        count(*) AS members, max(({$date})::timestamptz) AS changed_at
-                 FROM consent_recipients r
-                 JOIN recipient_customers rc ON rc.recipient_id = r.id AND rc.tenant_id = r.tenant_id
-                 JOIN customers c ON c.id = rc.customer_id AND c.tenant_id = rc.tenant_id
-                 WHERE r.tenant_id = ? AND r.address_type = ? AND ({$flag}) IS NOT NULL
-                 GROUP BY r.id",
-                [$this->context->requireTenant(), $type],
-            );
-
-            $batch = [];
-            foreach ($rows as $row) {
-                $batch[] = $row;
-                if (count($batch) === 1000) {
-                    $count += $this->observeSnapshot($batch, $channel, $provider);
-                    $batch = [];
-                }
-            }
-            $count += $this->observeSnapshot($batch, $channel, $provider);
-        }
-
-        return $count;
     }
 
     /**
@@ -172,7 +239,7 @@ final class ConsentSynchronizer
     /**
      * Ticimax permission history in monthly windows (no paging exists).
      */
-    public function ticimaxHistory(TenantIntegration $commerce, ?CarbonImmutable $from = null, ?Actor $actor = null, ?float $sliceSeconds = null): IntegrationSyncRun
+    public function ticimaxHistory(TenantIntegration $commerce, ?CarbonImmutable $from = null, ?Actor $actor = null, ?float $sliceSeconds = null, bool $deferTransient = false): IntegrationSyncRun
     {
         $started = microtime(true);
         $cursor = $this->tracker->cursor($commerce, self::ENTITY_TICIMAX_HISTORY);
@@ -203,7 +270,7 @@ final class ConsentSynchronizer
 
             return $this->tracker->succeed($run, $commerce);
         } catch (Throwable $e) {
-            return $this->tracker->fail($run, $commerce, $e);
+            return $deferTransient && TransientFailure::is($e) ? $this->tracker->defer($run, $commerce, $e) : $this->tracker->fail($run, $commerce, $e);
         }
     }
 

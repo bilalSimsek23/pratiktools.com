@@ -41,6 +41,13 @@ return [
         'cart_lookback_hours' => 48,
         // First full order sync reads this far back.
         'order_backfill_days' => (int) env('COMMERCE_ORDER_BACKFILL_DAYS', 365),
+        // A queued run that hit a transient error (dropped Redis/database
+        // connection, provider timeout) tries again after these delays, then
+        // fails. Its saved page is kept, so a retry never starts over.
+        'retry_backoff_seconds' => [5, 15, 45, 120],
+        // A failed run continues at its saved page when started again within
+        // this many hours; older failures start over.
+        'resume_hours' => 48,
         // Full cart sync reads this far back.
         'cart_backfill_days' => 14,
     ],

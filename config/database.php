@@ -2,6 +2,16 @@
 
 use Illuminate\Support\Str;
 use Pdo\Mysql;
+use Predis\Retry\Strategy\ExponentialBackoff;
+
+// Predis ignores max_retries/backoff_* (phpredis options) and by default
+// never retries: a connection the server closed (idle timeout, restart,
+// scale to zero) failed the next command with ConnectionException. With a
+// retry, Predis disconnects and runs the command again on a new connection.
+// Backoff values are microseconds.
+$predisRetry = env('REDIS_CLIENT', 'predis') === 'predis' ? ['retry' => [ExponentialBackoff::class => [
+    (int) env('REDIS_BACKOFF_BASE', 100) * 1000, (int) env('REDIS_BACKOFF_CAP', 1000) * 1000,
+]]] : [];
 
 return [
 
@@ -213,7 +223,7 @@ return [
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
             'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
-        ],
+        ] + $predisRetry,
 
         'cache' => [
             'url' => env('REDIS_URL'),
@@ -227,7 +237,7 @@ return [
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
             'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
-        ],
+        ] + $predisRetry,
 
     ],
 

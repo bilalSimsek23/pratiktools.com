@@ -6,6 +6,7 @@ use App\Audit\Actor;
 use App\Audit\AuditAction;
 use App\Commerce\ConnectionTester;
 use App\Commerce\Data\ConnectionCheck;
+use App\Commerce\Onboarding\TicimaxOnboarding;
 use App\Commerce\TicimaxIntegrations;
 use App\Models\PlatformAdmin;
 use App\Models\TenantIntegration;
@@ -25,7 +26,11 @@ use InvalidArgumentException;
  * The member code (UyeKodu) is written through TicimaxIntegrations into the
  * vault and is never read back here: the screen only learns whether one is
  * stored and when it last changed. The connection test is the existing
- * read-only ConnectionTester; nothing here starts a sync.
+ * read-only ConnectionTester.
+ *
+ * Veri senkronizasyonu: the setup steps of TicimaxOnboarding (their state,
+ * progress, errors and retries) and the buttons that queue them. Nothing
+ * here runs a sync in the request: it queues the existing jobs and returns.
  */
 final class TenantTicimax
 {
@@ -35,14 +40,78 @@ final class TenantTicimax
         private readonly TenantContext $context,
         private readonly TicimaxIntegrations $integrations,
         private readonly ConnectionTester $tester,
+        private readonly TicimaxOnboarding $onboarding,
     ) {}
 
     /**
      * Metadata only: never the member code or its ciphertext.
      *
-     * @return array{integration: ?array{status: string, has_secret: bool, service_url: ?string, storefront_url: ?string, last_verified_at: ?string, last_error: ?string, secret_changed_at: ?string, secret_changed_by: ?string}}
+     * @return array{integration: ?array{status: string, has_secret: bool, service_url: ?string, storefront_url: ?string, last_verified_at: ?string, last_error: ?string, secret_changed_at: ?string, secret_changed_by: ?string}, sync: ?array{steps: array<string, array<string, mixed>>, overall: string, next: ?string, active: bool}}
      */
     public function show(string $tenantId): array
+    {
+        return $this->metadata($tenantId) + ['sync' => $this->sync($tenantId)];
+    }
+
+    /**
+     * Ticimax Hazırlık on the tenant page: one line per step and the overall
+     * state.
+     *
+     * @return array{steps: array<string, array<string, mixed>>, overall: string, next: ?string, active: bool}
+     */
+    public function readiness(string $tenantId): array
+    {
+        return $this->sync($tenantId) ?? ['steps' => [], 'overall' => 'not_configured', 'next' => null, 'active' => false];
+    }
+
+    /**
+     * Kurulumu Başlat / başarısız adımdan devam et.
+     */
+    public function startOnboarding(string $tenantId, Actor $actor): void
+    {
+        $this->withIntegration($tenantId, fn (TenantIntegration $i) => $this->onboarding->start($i, $actor));
+    }
+
+    /**
+     * Başlat / Yeniden Dene / Devam Et for one step.
+     */
+    public function startStep(string $tenantId, string $step, Actor $actor): void
+    {
+        $this->withIntegration($tenantId, fn (TenantIntegration $i) => $this->onboarding->startStep($i, $step, $actor));
+    }
+
+    /**
+     * @return ?array{steps: array<string, array<string, mixed>>, overall: string, next: ?string, active: bool}
+     */
+    private function sync(string $tenantId): ?array
+    {
+        return $this->context->run($this->id($tenantId), function () {
+            $i = TenantIntegration::query()->where('provider', 'ticimax')->where('capability', 'commerce')->first();
+            if ($i === null) {
+                return null;
+            }
+            $steps = $this->onboarding->steps($i);
+
+            return ['steps' => $steps, 'overall' => $this->onboarding->overall($i, $steps), 'next' => $this->onboarding->next($i, $steps), 'active' => $this->onboarding->active($i)];
+        });
+    }
+
+    private function withIntegration(string $tenantId, \Closure $action): void
+    {
+        try {
+            $this->context->run($this->id($tenantId), function () use ($action) {
+                $action(TenantIntegration::query()->where('provider', 'ticimax')->where('capability', 'commerce')->first()
+                    ?? throw new ProvisioningError('Bu müşteri için Ticimax entegrasyonu yok.'));
+            });
+        } catch (InvalidArgumentException $e) {
+            throw new ProvisioningError($e->getMessage());
+        }
+    }
+
+    /**
+     * @return array{integration: ?array<string, mixed>}
+     */
+    private function metadata(string $tenantId): array
     {
         $row = $this->context->run($this->id($tenantId), function () {
             $i = DB::table('tenant_integrations')->where('provider', 'ticimax')->where('capability', 'commerce')
