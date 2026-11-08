@@ -169,7 +169,7 @@ final class CampaignsAndContentTest extends TestCase
         $campaign = $this->campaign();
         $r = $this->readiness($campaign);
 
-        foreach (['CONTENT', 'AUDIENCE', 'SENDER', 'DKIM', 'UNSUBSCRIBE', 'IYS'] as $check) {
+        foreach (['CONTENT', 'AUDIENCE', 'SENDER', 'DKIM', 'UNSUBSCRIBE', 'CONSENT'] as $check) {
             $this->assertSame('PASS', $this->checkStatus($r, $check), $check);
         }
         $this->assertSame('WARN', $this->checkStatus($r, 'MAIL_FROM'), 'A missing custom MAIL FROM never blocks.');
@@ -233,7 +233,7 @@ final class CampaignsAndContentTest extends TestCase
         $this->assertSame(3, $report['valid_identity']);
         $this->assertSame(0, $report['currently_eligible']);
         $this->assertSame(3, $report['iys_unknown_or_stale']);
-        $this->assertSame('Marketing sending is blocked because IYS consent could not be verified.', $report['explanation']);
+        $this->assertSame('Marketing sending is blocked because the consent basis of this tenant cannot back a decision right now.', $report['explanation']);
         $r = $this->readiness($campaign);
         $this->assertContains('IYS_UNAVAILABLE', $r['reason_codes']);
         $this->assertContains('NO_ELIGIBLE_RECIPIENTS', $r['reason_codes']);

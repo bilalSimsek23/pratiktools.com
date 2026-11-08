@@ -227,11 +227,23 @@
         <p class="hint">"Hazır" yalnız gönderim modu canlıyken görünür; altyapının hazır olması gönderimin açık olduğu anlamına gelmez.</p>
     </div>
     <div class="card" id="kampanya-hazirlik"><h2>11 Kasım E-posta Hazırlığı <span class="badge {{ $launch['sendable'] ? 'b-ok' : 'b-bad' }}">{{ $launch['verdict'] }}</span></h2>
-        <p class="muted">Bu müşteri canlı bir pazarlama kampanyası gönderebilir mi? Resmi İYS ONAY yalnız İYS, ViA ve İYS mutabakatından sayılır; Ticimax MailIzin İYS ONAY yerine kullanılmaz.</p>
-        <ul class="list-plain">@foreach ($launch['checks'] as $key => $c)
+        <p class="muted">Bu müşteri, izni olan mevcut kitlesine canlı bir pazarlama kampanyası gönderebilir mi? İzin dayanağı: <strong>{{ $launch['strategy']['label'] }}</strong>.
+            @if ($launch['strategy']['strategy'] === 'merchant_verified') Mağaza (Ticimax) izinleri müşterinin beyanıyla kullanılır; bu bir İYS veya ViA doğrulaması değildir. @else Ticimax MailIzin bu stratejide izin yerine kullanılmaz. @endif</p>
+        @foreach (['delivery' => 'Gönderim (hepsi PASS olmalı)', 'acquisition' => 'Yeni izin toplama (uyarı; gönderimi engellemez)'] as $group => $title)
+        <h3>{{ $title }}</h3>
+        <ul class="list-plain">@foreach (array_filter($launch['checks'], fn ($c) => $c['group'] === $group) as $key => $c)
             <li class="split" id="launch-{{ strtolower($key) }}"><span>{{ $c['label'] }}@if ($c['detail'])<br><span class="muted">{{ $c['detail'] }}</span>@endif</span>
-                <span class="badge {{ $c['status'] === 'PASS' ? 'b-ok' : 'b-bad' }}">{{ $c['status'] }}</span></li>
+                <span class="badge {{ ['PASS' => 'b-ok', 'WARN' => 'b-warn'][$c['status']] ?? 'b-bad' }}">{{ $c['status'] }}</span></li>
         @endforeach</ul>
+        @endforeach
+        <h3>E-posta alıcıları — neden kırılımı</h3>
+        <table id="launch-breakdown"><tbody>
+            @foreach ($launch['breakdown'] as $code => $n)
+                <tr><td>{{ \App\Email\EmailLaunchReadiness::BREAKDOWN[$code] ?? $code }}</td><td>{{ number_format($n) }}</td></tr>
+            @endforeach
+            <tr><td><strong>Toplam e-posta alıcısı</strong></td><td><strong>{{ number_format($launch['counts']['recipients']) }}</strong></td></tr>
+        </tbody></table>
+        <p class="hint">Kampanya segmenti ve sıklık sınırı kampanyanın kendi hazırlığında ayrıca uygulanır.</p>
     </div>
 </div>
 <script nonce="{{ $cspNonce }}">

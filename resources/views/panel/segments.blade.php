@@ -5,7 +5,8 @@
     $groups = old('groups', [['match' => 'all', 'rows' => [['field' => 'last_order_at', 'op' => 'before_days_ago', 'value' => '90'], ['field' => 'order_count', 'op' => 'gte', 'value' => '2']]]]);
     $reasonLabels = ['NO_EMAIL_RECIPIENT' => 'E-posta adresi yok', 'NO_PUSH_IDENTITY' => 'Push kimliği yok', 'NOT_SUBSCRIBED_OR_SUPPRESSED' => 'Abone değil / bastırılmış',
         'IYS_UNAVAILABLE' => 'İYS doğrulanamıyor', 'IYS_UNKNOWN' => 'İYS durumu bilinmiyor', 'IYS_RET' => 'İYS ret', 'LOCAL_SUPPRESSED' => 'Bastırılmış', 'MARKETPLACE_IDENTITY' => 'Pazaryeri adresi',
-        'INVALID_EMAIL' => 'Geçersiz adres', 'IDENTITY_CONFLICT' => 'Kimlik çakışması', 'IYS_STALE' => 'İYS verisi eski'];
+        'INVALID_EMAIL' => 'Geçersiz adres', 'IDENTITY_CONFLICT' => 'Kimlik çakışması', 'IYS_STALE' => 'İYS verisi eski',
+        'MERCHANT_NOT_GRANTED' => 'Mağaza izni yok / geri çekilmiş', 'MERCHANT_CONSENT_STALE' => 'Mağaza izin senkronu güncel değil'];
 @endphp
 <div class="page-head">
     <div><h1>Segmentler</h1><p>Kuralları listeden seçerek kitle tanımlayın; önizleme eşleşen kişi sayısını ve gönderilebilir kitleyi gösterir. Kişi listesi gösterilmez.</p></div>

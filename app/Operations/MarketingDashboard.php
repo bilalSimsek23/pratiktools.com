@@ -31,7 +31,9 @@ final class MarketingDashboard
         $campaigns = DB::table('campaigns')->where('tenant_id', $tenantId)->selectRaw('status, count(*) AS n')->groupBy('status')->pluck('n', 'status')->map(fn ($n) => (int) $n)->all();
         $status = $this->integrations->all();
         $blockers = $this->blockers->all($status);
-        $externallyBlocked = collect($blockers)->contains(fn ($b) => $b['status'] !== 'PASS');
+        // Only the delivery group blocks; acquisition rows (ViA, İYS API under
+        // merchant_verified) are warnings.
+        $externallyBlocked = ExternalBlockers::blocking($blockers) !== [];
         $active = ($campaigns['draft'] ?? 0) + ($campaigns['ready'] ?? 0) + ($campaigns['scheduled'] ?? 0) + ($campaigns['paused'] ?? 0);
         $leads = DB::table('lead_metrics_daily')->where('tenant_id', $tenantId)->where('day', '>=', $since->toDateString())
             ->selectRaw('coalesce(sum(submissions), 0) AS submissions, coalesce(sum(accepted), 0) AS accepted')->first();

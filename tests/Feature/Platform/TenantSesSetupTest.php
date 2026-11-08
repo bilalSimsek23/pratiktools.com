@@ -408,16 +408,21 @@ final class TenantSesSetupTest extends TestCase
         $launch = $this->launch();
         $this->assertFalse($launch['sendable']);
         $this->assertSame('NO-GO', $launch['verdict']);
-        $this->assertSame(['audience' => 2, 'official_consent' => 0], array_intersect_key($launch['counts'], ['audience' => 1, 'official_consent' => 1]));
-        $this->assertSame('BLOCKED', $launch['checks']['IYS_OFFICIAL_CONSENT']['status']);
-        $this->assertStringContainsString('Canlı kampanya için BLOCKED', (string) $launch['checks']['IYS_OFFICIAL_CONSENT']['detail']);
-        $this->assertStringContainsString('Ticimax MailIzin İYS ONAY yerine kullanılmaz', (string) $launch['checks']['IYS_OFFICIAL_CONSENT']['detail']);
+        $this->assertSame(['recipients' => 2, 'allowed' => 0], array_intersect_key($launch['counts'], ['recipients' => 1, 'allowed' => 1]));
+        // Default strategy (İYS API): Ticimax MailIzin is not a permission, so nobody may be sent to.
+        $this->assertSame(['BLOCKED', 'delivery'], [$launch['checks']['CONSENT_BASIS']['status'], $launch['checks']['CONSENT_BASIS']['group']]);
+        $this->assertStringContainsString('İYS API (doğrudan). Hazır değil', (string) $launch['checks']['CONSENT_BASIS']['detail']);
+        $this->assertSame(['BLOCKED', '0 / 2'], [$launch['checks']['AUDIENCE']['status'], substr((string) $launch['checks']['AUDIENCE']['detail'], 0, 5)]);
+        $this->assertSame(2, $launch['breakdown']['IYS_UNAVAILABLE']);
         $this->assertSame(['BLOCKED', 'Canlı dispatch henüz desteklenmiyor.'], [$launch['checks']['LIVE_DISPATCH']['status'], $launch['checks']['LIVE_DISPATCH']['detail']]);
         // Live modes without a sent test e-mail: SES itself is not ready yet either.
-        $this->assertSame(['BLOCKED', 'PASS', 'PASS', 'BLOCKED', 'PASS'], [$launch['checks']['SES_READY']['status'], $launch['checks']['SENDING_MODE']['status'],
-            $launch['checks']['AUDIENCE']['status'], $launch['checks']['TEMPLATE']['status'], $launch['checks']['DKIM']['status']]);
+        $this->assertSame(['BLOCKED', 'PASS', 'BLOCKED', 'PASS'], [$launch['checks']['SES_READY']['status'], $launch['checks']['SENDING_MODE']['status'],
+            $launch['checks']['TEMPLATE']['status'], $launch['checks']['DKIM']['status']]);
+        // New consent collection is a warning, never a blocker.
+        $this->assertSame(['WARN', 'acquisition'], [$launch['checks']['VIA_FRAME']['status'], $launch['checks']['VIA_FRAME']['group']]);
 
-        $this->asAdmin()->get($this->page())->assertOk()->assertSee('11 Kasım E-posta Hazırlığı')->assertSee('NO-GO')->assertSee('Canlı dispatch henüz desteklenmiyor.');
+        $this->asAdmin()->get($this->page())->assertOk()->assertSee('11 Kasım E-posta Hazırlığı')->assertSee('NO-GO')->assertSee('Canlı dispatch henüz desteklenmiyor.')
+            ->assertSee('Ticimax MailIzin bu stratejide izin yerine kullanılmaz')->assertSee('Yeni izin toplama (uyarı; gönderimi engellemez)');
 
         // With sending off, even more is blocked; there is no path to GO.
         $this->emailModes($this->tenant, 'off', 'off');

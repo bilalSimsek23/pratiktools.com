@@ -480,7 +480,7 @@ final class ViaReconciliationTest extends TestCase
         $readiness = $this->inTenant($this->tenant, fn () => app(CampaignReadiness::class)->evaluate(app(Campaigns::class)->find($campaign)));
         $this->assertSame(['via_reconciliation', 'ViA + İYS mutabakatı'], [$readiness['consent']['strategy'], $readiness['consent']['source']]);
         $this->assertNotNull($readiness['consent']['last_reconciliation']);
-        $this->assertSame('PASS', collect($readiness['checks'])->firstWhere('check', 'IYS')['status']);
+        $this->assertSame('PASS', collect($readiness['checks'])->firstWhere('check', 'CONSENT')['status']);
         $this->assertSame(1, $report()['currently_eligible']);
         $this->assertTrue($this->inTenant($this->tenant, fn () => app(ActionEligibility::class)->email($this->customer, 'marketing')['ok']));
 

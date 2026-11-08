@@ -60,8 +60,9 @@ Readiness (`GET /api/v1/campaigns/{id}`, machine-readable):
 Audience preview (`GET /api/v1/campaigns/{id}/audience`, counts only): raw
 audience, customers without e-mail, valid identity, invalid, marketplace,
 suppressed, consent blocked, İYS unknown/stale, frequency capped, currently
-eligible, and the explanation "Marketing sending is blocked because IYS
-consent could not be verified." while İYS is unavailable.
+eligible, and the explanation "Marketing sending is blocked because the
+consent basis of this tenant cannot back a decision right now." while the
+tenant's consent strategy is not operational.
 
 Dry-run (`campaign dry-run --campaign=<id>`, `POST /api/v1/campaigns/{id}/dry-run`):
 the same plus planned e-mail count, inside a READ ONLY transaction.

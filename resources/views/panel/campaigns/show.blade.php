@@ -4,7 +4,7 @@
 @php
     $ricon = ['PASS' => ['pass', '✓'], 'WARN' => ['warn', '!'], 'BLOCKED' => ['bad', '✕']];
     $checkLabels = ['CONTENT' => 'İçerik', 'AUDIENCE' => 'Kitle', 'SENDER' => 'Gönderici', 'DKIM' => 'DKIM', 'MAIL_FROM' => 'MAIL FROM', 'UNSUBSCRIBE' => 'Abonelikten çıkma',
-        'IYS' => 'İYS izin doğrulaması', 'ELIGIBLE_AUDIENCE' => 'Gönderilebilir alıcı', 'SES_PRODUCTION_ACCESS' => 'Amazon SES production', 'EMAIL_SENDING_MODE' => 'E-posta gönderim modu',
+        'CONSENT' => 'İzin dayanağı', 'ELIGIBLE_AUDIENCE' => 'Gönderilebilir alıcı', 'SES_PRODUCTION_ACCESS' => 'Amazon SES production', 'EMAIL_SENDING_MODE' => 'E-posta gönderim modu',
         'DISPATCH' => 'Canlı gönderim'];
     $slotLabels = ['review' => 'İnceleme', 'approve' => 'Onay'];
     $apStatus = ['pending' => ['b-warn', 'Bekliyor'], 'approved' => ['b-pass', 'Onaylandı'], 'rejected' => ['b-bad', 'Reddedildi'], 'expired' => ['b-muted', 'Süresi doldu'], 'invalidated' => ['b-muted', 'Geçersiz']];

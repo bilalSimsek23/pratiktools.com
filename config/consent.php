@@ -34,6 +34,14 @@ return [
         'store_opt_out_blocks' => true,
     ],
 
+    // merchant_verified (IGS, 2026-11-08): store permissions attested by the
+    // tenant. Hours a successful Ticimax permission history sync keeps
+    // decisions current; older (or never synced) means MERCHANT_CONSENT_STALE
+    // for everyone.
+    'merchant' => [
+        'max_age_hours' => env('CONSENT_MERCHANT_MAX_AGE_HOURS', 24),
+    ],
+
     // F2-R: ViA consent acquisition + İYS daily change reports. The tenant's
     // consent_strategy (direct_api | via_reconciliation) is chosen by an
     // operator (consent:strategy); nothing here switches it.

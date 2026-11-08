@@ -19,6 +19,19 @@ use Illuminate\Support\Facades\DB;
  *  2. marketplace relay address                MARKETPLACE_IDENTITY
  *  3. active local suppression                 LOCAL_SUPPRESSED
  *  4. official RET (individual or merchant)    IYS_REVOKED      (RET always wins)
+ *  -- merchant_verified (store permissions attested by the tenant; not an
+ *     İYS verification) decides here and stops:
+ *     a. strategy not operational (no attestation,
+ *        store not connected, permission sync
+ *        missing or too old)                    MERCHANT_CONSENT_STALE
+ *     b. latest store e-mail permission (Ticimax
+ *        member or newsletter; RET wins a tie)
+ *        is not GRANTED                         MERCHANT_NOT_GRANTED
+ *     c. an explicit opt-out at the store or an
+ *        unsubscribe after that permission      MERCHANT_NOT_GRANTED
+ *     d. address shared by several customers    IDENTITY_CONFLICT
+ *     e. otherwise                              ALLOWED
+ *     A lead form checkbox is never a permission here.
  *  5. the tenant's consent strategy cannot
  *     back a decision (ConsentStrategy)        IYS_UNAVAILABLE
  *  6. via_reconciliation: last applied İYS
@@ -79,6 +92,7 @@ final class SendEligibility
         return new EligibilityDecision($channel, EligibilityReason::from($row->reason), $recipientId, [
             'iys_individual' => $row->iys_i,
             'iys_merchant' => $row->iys_m,
+            'store' => $row->store_status,
             'store_revoked_at' => $row->store_revoked_at,
             'linked_customers' => (int) $row->customers,
         ]);
@@ -119,6 +133,13 @@ final class SendEligibility
                     WHEN b.is_marketplace THEN 'MARKETPLACE_IDENTITY'
                     WHEN b.suppressed THEN 'LOCAL_SUPPRESSED'
                     WHEN b.iys_i = 'REVOKED' OR b.iys_m = 'REVOKED' THEN 'IYS_REVOKED'
+                    WHEN ?::boolean THEN CASE
+                        WHEN NOT ?::boolean THEN 'MERCHANT_CONSENT_STALE'
+                        WHEN b.store_status IS DISTINCT FROM 'GRANTED' THEN 'MERCHANT_NOT_GRANTED'
+                        WHEN b.store_revoked_at IS NOT NULL AND (b.store_as_of IS NULL OR b.store_revoked_at >= b.store_as_of) THEN 'MERCHANT_NOT_GRANTED'
+                        WHEN b.customers > 1 THEN 'IDENTITY_CONFLICT'
+                        ELSE 'ALLOWED'
+                    END
                     WHEN NOT ?::boolean THEN 'IYS_UNAVAILABLE'
                     WHEN ?::boolean THEN 'IYS_RECONCILIATION_STALE'
                     WHEN (b.iys_i IS NULL OR b.iys_i = 'UNKNOWN') AND b.via_pending THEN 'IYS_PENDING'
@@ -135,6 +156,7 @@ final class SendEligibility
                     (SELECT count(*) FROM recipient_customers rc WHERE rc.tenant_id = r.tenant_id AND rc.recipient_id = r.id) AS customers,
                     EXISTS (SELECT 1 FROM suppressions s WHERE s.tenant_id = r.tenant_id AND s.recipient_id = r.id AND s.lifted_at IS NULL AND (s.channel IS NULL OR s.channel = 'EMAIL')) AS suppressed,
                     ii.status AS iys_i, ii.last_verified_at AS iys_i_verified, ii.consent_date AS iys_i_date, im.status AS iys_m,
+                    st.status AS store_status, (st.metadata->>'as_of')::timestamptz AS store_as_of,
                     EXISTS (SELECT 1 FROM via_consent_requests v WHERE v.tenant_id = r.tenant_id AND v.recipient_id = r.id AND v.channel = 'EMAIL' AND v.state = 'pending') AS via_pending,
                     (SELECT max((c.metadata->>'as_of')::timestamptz) FROM consents c
                        WHERE c.tenant_id = r.tenant_id AND c.recipient_id = r.id AND c.channel = 'EMAIL' AND c.source_provider NOT IN ({$official})
@@ -142,6 +164,12 @@ final class SendEligibility
                 FROM consent_recipients r
                 {$latest('INDIVIDUAL')} ii ON true
                 {$latest('MERCHANT')} im ON true
+                LEFT JOIN LATERAL (
+                    SELECT c.status, c.metadata FROM consents c
+                    WHERE c.tenant_id = r.tenant_id AND c.recipient_id = r.id AND c.channel = 'EMAIL' AND c.recipient_type = 'INDIVIDUAL'
+                      AND c.source_provider IN ('TICIMAX', 'TICIMAX_NEWSLETTER')
+                    ORDER BY (c.metadata->>'as_of')::timestamptz DESC NULLS LAST, (c.status = 'REVOKED') DESC LIMIT 1
+                ) st ON true
                 WHERE r.tenant_id = ? AND r.address_type = 'email' {$filter}
             ) b
             SQL;
@@ -152,9 +180,11 @@ final class SendEligibility
      */
     public function bindings(): array
     {
-        [$operational, $stale, $rowFreshness] = $this->strategy->eligibilityFlags();
+        [$operational, $stale, $rowFreshness, $merchant] = $this->strategy->eligibilityFlags();
 
         return [
+            $merchant,
+            $operational,
             $operational,
             $stale,
             $rowFreshness,
@@ -171,5 +201,14 @@ final class SendEligibility
     public function iysAvailable(): bool
     {
         return $this->strategy->directApiAvailable();
+    }
+
+    /**
+     * Whether the tenant's consent strategy can back a decision at all
+     * (İYS API, ViA + reconciliation, or the attested store permissions).
+     */
+    public function consentBasisAvailable(): bool
+    {
+        return $this->strategy->eligibilityFlags()[0];
     }
 }

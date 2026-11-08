@@ -157,7 +157,10 @@ final class ViaOtpTest extends TestCase
         $this->assertSame(0, $this->rows('consents', fn ($q) => $q->where('source_provider', 'VIA')));
 
         $row = collect($this->inTenant($this->tenant, fn () => app(ExternalBlockers::class)->all()))->firstWhere('blocker', 'IYS_VIA');
-        $this->assertSame(['WAIT', 'ViA OTP form is awaiting İYS approval.'], [$row['status'], $row['detail']]);
+        // Under direct_api ViA is a new consent channel: a warning, not a delivery blocker.
+        $this->assertSame(['WARN', 'acquisition'], [$row['status'], $row['group']]);
+        $this->assertStringContainsString('ViA OTP form is awaiting İYS approval.', $row['detail']);
+        $this->assertSame([], array_filter(ExternalBlockers::blocking([$row])));
     }
 
     public function test_approval_alone_is_not_enough_the_technical_configuration_must_exist(): void
@@ -320,7 +323,7 @@ final class ViaOtpTest extends TestCase
 
         $as($this->owner)->get('/app/integrations')->assertOk()->assertSee('İYS ViA')->assertSee('Onay bekliyor')->assertSee('TE••••••••01')->assertDontSee(self::FORM_ID)
             ->assertSee('ViA OTP form is awaiting İYS approval.')->assertSee('Kapalı');
-        $as($this->owner)->get('/app/readiness')->assertOk()->assertSee('Bekliyor');
+        $as($this->owner)->get('/app/readiness')->assertOk()->assertSee('Yeni izin toplama')->assertSee('Uyarı');
 
         $marketer = $this->addMember($this->tenant, TenantRole::Marketer);
         $as($marketer)->post('/app/integrations/via/form-status', ['status' => 'approved', 'note' => 'x', 'portal_confirmed' => 1])->assertForbidden();

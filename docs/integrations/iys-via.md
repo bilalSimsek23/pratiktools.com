@@ -16,13 +16,18 @@ pipeline are described in
 - A real form was created: "IGS E-Ticaret İletişim İzni" (OTP, ETK).
 - İYS generated a Form ID for it.
 - The form was submitted for approval ("Onaya Gönderildi").
+- 2026-11-08 (operator): İYS **approved** the form and it is **published**
+  ("Yayında"). The Form ID and the website URL were sent to İYS; İYS sent
+  the official ViA Frame demo/documentation
+  (https://via.iletiys.com.tr/frame-demo/demo.html) and will register the
+  domain (DNS) on its side. **Waiting for İYS to confirm the domain
+  activation.** The panel's form status is recorded separately (audited
+  approval in Entegrasyonlar) and was not changed by this note.
 
 ### PENDING (unknown, not implemented, not guessed)
 
-- İYS template/form approval.
-- Official OTP integration instructions.
-- Official endpoint / SDK / frame details.
-- Callback / event format (and how events are authenticated).
+- İYS confirmation of the Frame domain (DNS) activation.
+- Callback / event format beyond the Frame's browser events (and how events are authenticated).
 - ViA Ret technical integration.
 - İYS daily reconciliation report format (and a real sample).
 
@@ -91,8 +96,13 @@ The command can only set `draft` or `pending_approval`.
 The panel shows this as the external readiness row `IYS_VIA` (WAIT counts
 as not ready for live sending) and as the İYS ViA card.
 
-**IGS today: WAIT (`VIA_FORM_PENDING_APPROVAL`); production consent
-acquisition blocked.**
+**IGS (2026-11-08):** the form is approved and published in the İYS
+portal; the Frame is not live on the website until İYS confirms the domain
+activation. ViA is IGS's channel for *new* consents only: it is shown as an
+acquisition warning ("Yeni izin toplama kanalı") and does not block sending
+to the audience that already consented (see
+[../production/consent-merchant-verified.md](../production/consent-merchant-verified.md)).
+Server-side OTP stays closed.
 
 ## OTP boundary
 

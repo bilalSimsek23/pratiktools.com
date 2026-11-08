@@ -2,15 +2,15 @@
 @section('title', 'Hazırlık')
 @section('content')
 <div class="page-head">
-    <div><h1>Hazırlık</h1><p>Canlı gönderimin önündeki harici gereksinimler. Bu maddeler gerçek verilerden hesaplanır; panelden atlanamaz.</p></div>
+    <div><h1>Hazırlık</h1><p>Canlı gönderimin önündeki harici gereksinimler. Bu maddeler gerçek verilerden hesaplanır; panelden atlanamaz. "Yeni izin toplama" maddeleri uyarıdır; mevcut izinli kitleye gönderimi engellemez.</p></div>
 </div>
 <div class="card">
     <ul class="readiness">
         @foreach ($blockers as $b)
             <li>
-                @php([$ic, $sym, $bc, $bl] = ['PASS' => ['pass', '✓', 'b-pass', 'Tamam'], 'WAIT' => ['warn', '…', 'b-warn', 'Bekliyor']][$b['status']] ?? ['bad', '✕', 'b-bad', 'Engelli'])
+                @php([$ic, $sym, $bc, $bl] = ['PASS' => ['pass', '✓', 'b-pass', 'Tamam'], 'WAIT' => ['warn', '…', 'b-warn', 'Bekliyor'], 'WARN' => ['warn', '!', 'b-warn', 'Uyarı']][$b['status']] ?? ['bad', '✕', 'b-bad', 'Engelli'])
                 <span class="ricon {{ $ic }}">{{ $sym }}</span>
-                <div><div class="title">{{ \Illuminate\Support\Str::of($b['blocker'])->replace('_', ' ')->title() }}</div>
+                <div><div class="title">{{ \Illuminate\Support\Str::of($b['blocker'])->replace('_', ' ')->title() }} <span class="small muted">· {{ $b['group'] === 'acquisition' ? 'Yeni izin toplama' : 'Gönderim' }}</span></div>
                     <div class="why">{{ $b['detail'] }}</div>
                     @if ($b['status'] !== 'PASS' && $b['action'])<div class="todo">→ {{ $b['action'] }}</div>@endif</div>
                 <span class="badge {{ $bc }}">{{ $bl }}</span>

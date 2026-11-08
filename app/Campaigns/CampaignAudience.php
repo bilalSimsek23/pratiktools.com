@@ -79,7 +79,7 @@ final class CampaignAudience
         $capped = $allowed === 0 ? 0 : $this->capped("SELECT e.id FROM ({$this->eligibility->sql("AND r.id IN ({$recipientFilter})")}) e WHERE e.reason = 'ALLOWED'",
             [...$this->eligibility->bindings(), $tenantId, ...$aud['bindings']]);
         $recipients = array_sum($reasons);
-        $iysAvailable = $this->eligibility->iysAvailable();
+        $basisAvailable = $this->eligibility->consentBasisAvailable();
 
         return [
             'audience_frozen' => $aud['frozen'],
@@ -96,7 +96,7 @@ final class CampaignAudience
             'frequency_capped' => $capped,
             'currently_eligible' => $allowed - $capped,
             'reasons' => $reasons,
-            'explanation' => $iysAvailable ? null : 'Marketing sending is blocked because IYS consent could not be verified.',
+            'explanation' => $basisAvailable ? null : 'Marketing sending is blocked because the consent basis of this tenant cannot back a decision right now.',
             'duration_ms' => (int) ((hrtime(true) - $started) / 1e6),
         ];
     }

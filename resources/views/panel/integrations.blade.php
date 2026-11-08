@@ -13,10 +13,10 @@
             'Yetenek' => 'Veri okuma · Ticimax\'e yazma kapalı',
         ], $blocked('TICIMAX_VAULT_CONNECTION')],
         ['İYS', 'İleti Yönetim Sistemi — pazarlama izni · strateji: '.$iys['strategy']['label'], $iys, [
-            'Sağlık' => $iys['strategy']['ready'] ? 'İzin kararı verilebiliyor' : 'Fail-closed ('.$iys['strategy']['blocker'].')',
+            'Sağlık' => $iys['strategy']['ready'] ? 'İzin kararı verilebiliyor ('.$iys['strategy']['source_label'].')' : 'Fail-closed ('.$iys['strategy']['blocker'].')',
             'İYS API senkronu' => $iys['last_successful_status_sync'] ? $when($iys['last_successful_status_sync']) : 'Henüz yok'.($iys['strategy']['direct_api']['required'] ? '' : ' · bu stratejide gerekli değil'),
             'Yetenek' => 'İzin okuma · İYS/ViA\'ya yazma kapalı',
-        ], $blocked('IYS_API_ACCESS', 'IYS_VIA_RECONCILIATION'), 'iys'],
+        ], $blocked('IYS_API_ACCESS', 'IYS_VIA_RECONCILIATION', 'MERCHANT_CONSENT_BASIS'), 'iys'],
         ['Amazon SES', 'E-posta gönderim altyapısı', $ses, [
             'Sağlık' => ($ses['production_access'] ?? null) === true ? 'Production erişimi var' : (($ses['production_access'] ?? null) === false ? 'Sandbox (yalnızca doğrulanmış alıcılar)' : 'Hesap durumu bilinmiyor'),
             'Son kontrol' => $when($ses['account_checked_at'] ?? null).' · bölge '.($ses['region'] ?? '—'),

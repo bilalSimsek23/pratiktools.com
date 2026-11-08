@@ -7,8 +7,9 @@
     $sys = [
         ['Ticimax', $tcx['connected'] ? ['b-pass', 'Bağlı'] : ($tcx['configured'] ? ['b-warn', 'Kontrol gerekli'] : ['b-bad', 'Bağlı değil']),
             $tcx['last_sync'] ? 'Son senkron: '.\Illuminate\Support\Carbon::parse($tcx['last_sync']->started_at)->diffForHumans() : 'Henüz senkron yok'],
-        ['İYS', $iys['strategy']['ready'] ? ['b-pass', 'Doğrulanıyor'] : ['b-bad', $iys['strategy']['strategy'] === 'direct_api' ? 'API erişimi bekleniyor' : 'ViA/mutabakat bekleniyor'],
-            $iys['strategy']['label'].' · '.($iys['strategy']['ready'] ? 'izinler doğrulanıyor' : 'pazarlama e-postası İYS doğrulaması olmadan gönderilemez')],
+        ['İzin dayanağı', $iys['strategy']['ready'] ? ['b-pass', $iys['strategy']['strategy'] === 'merchant_verified' ? 'Mağaza izni' : 'Doğrulanıyor']
+                : ['b-bad', match ($iys['strategy']['strategy']) { 'direct_api' => 'API erişimi bekleniyor', 'merchant_verified' => 'Mağaza izni güncel değil', default => 'ViA/mutabakat bekleniyor' }],
+            $iys['strategy']['label'].' · '.($iys['strategy']['ready'] ? 'izin kararı verilebiliyor' : 'izin dayanağı hazır olmadan pazarlama e-postası gönderilemez')],
         ['Amazon SES', ! $ses['configured'] ? ['b-bad', 'Bağlı değil'] : (($ses['production_access'] ?? null) === true ? ['b-pass', 'Production'] : ['b-bad', 'Production erişimi bekleniyor']),
             $ses['configured'] ? 'Bölge '.($ses['region'] ?? '—').' · gönderim '.strtoupper($ses['sending_mode']) : 'Hesap bu ortamda bağlı değil'],
         ['OneSignal', ! $os['configured'] ? ['b-bad', 'Bağlı değil'] : (($os['external_id_coverage']['with'] ?? 0) > 0 ? ['b-pass', 'Bağlı'] : ['b-warn', 'Kimlik eşleştirme gerekli']),
@@ -78,14 +79,15 @@
 </div>
 
 <div class="card stack-top">
-    <div class="split"><h2>Harici engeller</h2><span class="small muted">Canlı gönderim bu maddeler tamamlanmadan açılamaz.</span></div>
+    <div class="split"><h2>Harici engeller</h2><span class="small muted">"Gönderim" maddeleri tamamlanmadan canlı gönderim açılamaz; "Yeni izin toplama" maddeleri uyarıdır, mevcut izinli kitleye gönderimi engellemez.</span></div>
     <div class="table-wrap"><table class="table">
-        <thead><tr><th>Gereksinim</th><th>Durum</th><th>Ayrıntı</th><th>Yapılması gereken</th></tr></thead>
+        <thead><tr><th>Gereksinim</th><th>Tür</th><th>Durum</th><th>Ayrıntı</th><th>Yapılması gereken</th></tr></thead>
         <tbody>
         @foreach ($blockers as $b)
             <tr>
                 <td><strong>{{ \Illuminate\Support\Str::of($b['blocker'])->replace('_', ' ')->title() }}</strong></td>
-                <td>@if ($b['status'] === 'PASS')<span class="badge b-pass">Tamam</span>@elseif ($b['status'] === 'WAIT')<span class="badge b-warn">Bekliyor</span>@else<span class="badge b-bad">Engelli</span>@endif</td>
+                <td class="small">{{ $b['group'] === 'acquisition' ? 'Yeni izin toplama' : 'Gönderim' }}</td>
+                <td>@if ($b['status'] === 'PASS')<span class="badge b-pass">Tamam</span>@elseif ($b['status'] === 'WAIT')<span class="badge b-warn">Bekliyor</span>@elseif ($b['status'] === 'WARN')<span class="badge b-warn">Uyarı</span>@else<span class="badge b-bad">Engelli</span>@endif</td>
                 <td class="muted">{{ $b['detail'] }}</td>
                 <td>{{ $b['action'] ?? '—' }}</td>
             </tr>

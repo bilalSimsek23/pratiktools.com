@@ -66,7 +66,9 @@ final class CampaignReadiness
         $add('UNSUBSCRIBE', 'preparation', $this->unsubscribe->available(), 'EMAIL_UNSUBSCRIBE_KEY_MISSING');
 
         $consent = $this->strategy->state();
-        $add('IYS', 'delivery', $consent['ready'], $consent['blocker'] ?? 'IYS_UNAVAILABLE');
+        // The consent basis of the tenant's strategy (İYS API, ViA + reconciliation
+        // or attested store permissions); not always İYS.
+        $add('CONSENT', 'delivery', $consent['ready'], $consent['blocker'] ?? 'IYS_UNAVAILABLE');
         $add('ELIGIBLE_AUDIENCE', 'delivery', $report !== null && $report['currently_eligible'] > 0, 'NO_ELIGIBLE_RECIPIENTS');
         $account = (array) (json_decode((string) DB::table('tenant_integrations')->where('tenant_id', $tenantId)->where('id', $campaign->integration_id)->value('settings'), true)['account'] ?? []);
         $add('SES_PRODUCTION_ACCESS', 'delivery', ($account['production_access'] ?? null) === true, $account === [] ? 'PROVIDER_STATUS_UNKNOWN' : 'SES_SANDBOX');

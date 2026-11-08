@@ -22,6 +22,13 @@ enum EligibilityReason: string
     // via_reconciliation: the last applied İYS change report is too old.
     case IysReconciliationStale = 'IYS_RECONCILIATION_STALE';
     case IdentityConflict = 'IDENTITY_CONFLICT';
+    // merchant_verified: the attested store permissions cannot back a
+    // decision right now (no attestation, store not connected, permission
+    // sync missing or too old).
+    case MerchantConsentStale = 'MERCHANT_CONSENT_STALE';
+    // merchant_verified: no current store e-mail permission, or an opt-out
+    // / unsubscribe after it.
+    case MerchantNotGranted = 'MERCHANT_NOT_GRANTED';
     case MerchantPolicyReview = 'MERCHANT_POLICY_REVIEW';
     case NoMarketingConsent = 'NO_MARKETING_CONSENT';
     case ChannelNotSupported = 'CHANNEL_NOT_SUPPORTED';
