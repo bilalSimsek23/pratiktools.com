@@ -11,6 +11,11 @@ use Illuminate\Support\Str;
  * settings only: nothing contacts ViA or İYS, so the best state is
  * "configuration ready", never "verified by ViA". Separate from
  * IysViaProvider::status(), which gates server-side OTP and stays blocked.
+ *
+ * READY needs, besides the approved OTP form, the Widget UUID and a Super
+ * Admin's confirmation that İYS activated the Frame for the one origin the
+ * Frame is embedded on (bound to the current Widget UUID and origins).
+ * Browser (Frame) events never count towards readiness.
  */
 final readonly class ViaFrameReadiness
 {
@@ -25,7 +30,7 @@ final readonly class ViaFrameReadiness
     public const LABELS = [
         self::NOT_CONFIGURED => 'Yapılandırılmadı',
         self::INCOMPLETE => 'Taslak / eksik',
-        self::READY => 'Yapılandırma hazır (ViA tarafından doğrulanmadı)',
+        self::READY => 'Hazır (İYS domain aktivasyonu teyitli)',
         self::PROBLEM => 'Sorunlu',
     ];
 
@@ -41,6 +46,7 @@ final readonly class ViaFrameReadiness
         if ($c === null) {
             return new self(self::NOT_CONFIGURED, []);
         }
+        $activated = $c->activatedOrigin();
         // blocking: a problem that needs a fix, not just a missing value.
         $checks = [
             ['key' => 'record', 'label' => 'Entegrasyon kaydı (via / consent_acquisition)', 'ok' => true, 'blocking' => false],
@@ -48,10 +54,17 @@ final readonly class ViaFrameReadiness
             ['key' => 'brand', 'label' => 'Marka', 'ok' => $c->brand !== null, 'blocking' => false],
             ['key' => 'package', 'label' => 'ViA paketi aktif', 'ok' => $c->packageStatus === 'active', 'blocking' => $c->packageStatus === 'inactive'],
             ['key' => 'form_type', 'label' => 'Form tipi OTP', 'ok' => $c->formType === 'OTP', 'blocking' => ! in_array($c->formType, ['OTP', 'unknown'], true)],
-            ['key' => 'form_id', 'label' => 'Form ID geçerli UUID', 'ok' => self::validFormId($c->formId), 'blocking' => $c->formId !== null && ! self::validFormId($c->formId)],
+            ['key' => 'form_id', 'label' => 'Portal Form ID geçerli UUID', 'ok' => self::validFormId($c->formId), 'blocking' => $c->formId !== null && ! self::validFormId($c->formId)],
             ['key' => 'form_status', 'label' => 'Form durumu: Onaylandı / Yayında', 'ok' => $c->formStatus === ViaFormStatus::Approved,
                 'blocking' => in_array($c->formStatus, [ViaFormStatus::Rejected, ViaFormStatus::Disabled], true)],
+            ['key' => 'widget_uuid', 'label' => 'ViA Frame Widget UUID geçerli', 'ok' => self::validWidgetUuid($c->widgetUuid),
+                'blocking' => $c->widgetUuid !== null && ! self::validWidgetUuid($c->widgetUuid)],
             ['key' => 'frame_origins', 'label' => 'En az bir izinli Frame origin', 'ok' => $c->frameOrigins !== [], 'blocking' => false],
+            ['key' => 'domain_activation', 'label' => 'İYS domain aktivasyonu teyit edildi (Super Admin)', 'ok' => $activated !== null, 'blocking' => false],
+            // The loader accepts exactly the host İYS activated; any other
+            // origin (www, a subdomain) only shows "Geçersiz alan adı".
+            ['key' => 'origin_matches', 'label' => 'Frame origin\'leri yalnız İYS\'nin aktive ettiği alan adı', 'ok' => $activated !== null && $c->frameOrigins === [$activated],
+                'blocking' => $activated !== null && $c->frameOrigins !== [$activated]],
         ];
         $state = match (true) {
             collect($checks)->contains('blocking', true) => self::PROBLEM,
@@ -77,16 +90,23 @@ final readonly class ViaFrameReadiness
         return $formId !== null && Str::isUuid($formId);
     }
 
+    public static function validWidgetUuid(?string $uuid): bool
+    {
+        return $uuid !== null && Str::isUuid($uuid);
+    }
+
     /**
-     * The official embed code for a ready configuration: the public Form ID
-     * only (no tenant id, secret or token). Null unless ready.
+     * The official embed code for a ready configuration, as in İYS's demo:
+     * the loader URL and the container id are both the Widget UUID, exactly
+     * as stored (the loader finds the container by that exact id). Nothing
+     * else (no tenant id, Form ID, secret or token). Null unless ready.
      */
     public function snippet(ViaConfig $c): ?string
     {
-        if (! $this->ready() || ! self::validFormId($c->formId)) {
+        if (! $this->ready() || ! self::validWidgetUuid($c->widgetUuid)) {
             return null;
         }
-        $id = strtolower((string) $c->formId);
+        $id = e((string) $c->widgetUuid);
 
         return '<script src="'.self::LOADER.$id.'" defer></script>'."\n".'<div id="'.$id.'"></div>';
     }

@@ -39,14 +39,21 @@ final class TenantViaFrame
     }
 
     /**
-     * @param  array{iys_number?: string, brand?: string, package_status?: string, form_id?: string, frame_origins?: list<string>}  $values
+     * @param  array{iys_number?: string, brand?: string, package_status?: string, form_id?: string, widget_uuid?: string, frame_origins?: list<string>}  $values
      */
     public function configure(string $tenantId, array $values, Actor $actor): void
     {
+        // Both stored exactly as İYS shows them: trimmed, case never changed.
         if (isset($values['form_id'])) {
-            $values['form_id'] = Str::lower(trim($values['form_id']));
+            $values['form_id'] = trim($values['form_id']);
             if (! ViaFrameReadiness::validFormId($values['form_id'])) {
-                throw new ProvisioningError('ViA Form ID bir UUID olmalı (ör. 123e4567-e89b-12d3-a456-426614174000).');
+                throw new ProvisioningError('ViA portal Form ID bir UUID olmalı (ör. 123e4567-e89b-12d3-a456-426614174000).');
+            }
+        }
+        if (isset($values['widget_uuid'])) {
+            $values['widget_uuid'] = trim($values['widget_uuid']);
+            if (! ViaFrameReadiness::validWidgetUuid($values['widget_uuid'])) {
+                throw new ProvisioningError('ViA Frame Widget UUID bir UUID olmalı (İYS aktivasyon bildirimindeki değer; DNS TXT doğrulama değeri değil).');
             }
         }
         // The only form and approval types ViA offers this tenant today.
@@ -62,6 +69,15 @@ final class TenantViaFrame
     {
         try {
             $this->context->run($this->id($tenantId), fn () => $this->configs->setFormStatus($to, $actor, $note, $portalConfirmed));
+        } catch (InvalidArgumentException $e) {
+            throw new ProvisioningError($e->getMessage());
+        }
+    }
+
+    public function confirmDomainActivation(string $tenantId, string $origin, string $note, bool $iysConfirmed, Actor $actor): void
+    {
+        try {
+            $this->context->run($this->id($tenantId), fn () => $this->configs->confirmDomainActivation($origin, $note, $iysConfirmed, $actor));
         } catch (InvalidArgumentException $e) {
             throw new ProvisioningError($e->getMessage());
         }

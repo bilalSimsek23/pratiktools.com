@@ -7,6 +7,7 @@ use App\Consent\SendEligibility;
 use App\Consent\Sync\ConsentSynchronizer;
 use App\Consent\Via\ViaConfigurations;
 use App\Consent\Via\ViaConsentProvider;
+use App\Consent\Via\ViaFrameReadiness;
 use App\Consent\Via\ViaStatus;
 use App\Email\EmailSendGuard;
 use App\Email\UnsubscribeTokens;
@@ -41,6 +42,7 @@ final class IntegrationStatus
     {
         $c = $this->via->current();
         $s = $this->viaProvider->status();
+        $frame = ViaFrameReadiness::of($c);
 
         return [
             'configured' => $c !== null,
@@ -65,6 +67,11 @@ final class IntegrationStatus
                 default => 'blocked',
             },
             'acquisition_allowed' => $s->configured(),
+            // The embedded ViA Frame (İYS runs the OTP); separate from the
+            // server-side ViA OTP above and from consent_mode=via.
+            'frame_state' => $frame->state,
+            'frame_label' => $frame->label(),
+            'frame_origin' => $c?->activatedOrigin(),
         ];
     }
 

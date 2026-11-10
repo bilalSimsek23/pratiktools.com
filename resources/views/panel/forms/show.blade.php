@@ -47,10 +47,10 @@
         <p class="small"><span class="muted">İYS'ye yazılmayı bekleyen ONAY:</span> {{ number_format($report['pending_iys_onay']) }} <span class="muted">(İYS yazımı kapalı)</span></p>
         <p class="small"><span class="muted">ViA onayı bekleyen:</span> {{ number_format($report['via_pending']) }} · <span class="muted">ViA ile tamamlanan:</span> {{ number_format($report['via_succeeded']) }} · <span class="muted">başarısız/süresi dolan:</span> {{ number_format($report['via_failed']) }}</p>
         <h2>İzin modu</h2>
-        <p class="small">{{ ($f->consent_mode ?? 'local_only') === 'via' ? 'ViA: pazarlama izni yalnızca İYS ViA onayı başarıyla tamamlanınca ONAY olur.' : 'Yalnızca yerel: işaretli kutu yerel kanıttır; İYS ONAY değildir.' }}</p>
+        <p class="small">{{ ($f->consent_mode ?? 'local_only') === 'via' ? 'ViA (sunucu tarafı OTP): pazarlama izni yalnızca İYS ViA onayı başarıyla tamamlanınca ONAY olur. Bu mod, sitede gömülü ViA Frame ile aynı şey değildir ve İYS\'nin resmî teknik bilgileri gelene kadar kapalıdır; bu modda gelen kayıtlar onay beklemede kalır.' : 'Yalnızca yerel: işaretli kutu yerel kanıttır; İYS ONAY değildir.' }}</p>
         @if ($canManage)
             <form method="post" action="{{ route('panel.forms.consent-mode', $f->id) }}" class="actions">@csrf
-                <select name="consent_mode"><option value="local_only" @selected(($f->consent_mode ?? 'local_only') === 'local_only')>Yalnızca yerel</option><option value="via" @selected(($f->consent_mode ?? '') === 'via')>ViA (İYS)</option></select>
+                <select name="consent_mode"><option value="local_only" @selected(($f->consent_mode ?? 'local_only') === 'local_only')>Yalnızca yerel</option><option value="via" @selected(($f->consent_mode ?? '') === 'via')>ViA sunucu OTP (İYS) · Frame değil</option></select>
                 <button class="btn" type="submit">Kaydet</button>
             </form>
         @endif

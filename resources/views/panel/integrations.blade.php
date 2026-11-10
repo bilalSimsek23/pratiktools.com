@@ -57,7 +57,7 @@
 @php($via = $s['via'])
 <div class="card stack-top" id="via">
     @php([$vcls, $vlabel] = ['PASS' => ['b-pass', 'Hazır'], 'WAIT' => ['b-warn', 'Bekliyor']][$via['level']] ?? ['b-bad', 'Engelli'])
-    <div class="split"><div><h2>İYS ViA</h2><div class="small muted">ViA OTP ile ETK izni alma — İYS'nin resmî teknik bilgileri gelene kadar bağlantı kapalı</div></div><span class="badge {{ $vcls }}">{{ $vlabel }}</span></div>
+    <div class="split"><div><h2>İYS ViA</h2><div class="small muted">İki ayrı kanal: sitede gömülü ViA Frame (OTP'yi ve İYS kaydını ViA yürütür) ve lead formlarının sunucu tarafı ViA OTP modu (<code>consent_mode=via</code>; İYS'nin resmî teknik bilgileri gelene kadar kapalı). Frame, sunucu tarafı modu açmaz.</div></div><span class="badge {{ $vcls }}">{{ $vlabel }}</span></div>
     @if ($via['configured'])
         @php($integrationLabels = ['ready' => 'Hazır', 'waiting_iys_approval' => 'İYS onayı bekleniyor', 'waiting_specification' => 'İYS teknik dokümanı bekleniyor', 'blocked' => 'Engelli', 'not_configured' => 'Yapılandırılmadı'])
         <ul class="list-plain small stack-top">
@@ -67,8 +67,9 @@
             <li class="split"><span class="muted">Onay tipi</span><span>{{ $via['approval_type'] }}</span></li>
             <li class="split"><span class="muted">Form ID</span><span><code>{{ $via['form_id_masked'] ?? 'Tanımlı değil' }}</code></span></li>
             <li class="split"><span class="muted">Form durumu</span><span>{{ $via['form_status_label'] }}</span></li>
-            <li class="split"><span class="muted">Teknik entegrasyon</span><span>{{ $integrationLabels[$via['integration_status']] ?? $via['integration_status'] }}</span></li>
-            <li class="split"><span class="muted">Production izin toplama</span>@if ($via['acquisition_allowed'])<span class="badge b-pass">Açık</span>@else<span class="badge b-bad">Kapalı</span>@endif</li>
+            <li class="split"><span class="muted">ViA Frame (sitede gömülü)</span><span>{{ $via['frame_label'] }}@if ($via['frame_origin']) · <code>{{ $via['frame_origin'] }}</code>@endif</span></li>
+            <li class="split"><span class="muted">Sunucu tarafı ViA OTP (consent_mode=via)</span><span>{{ $integrationLabels[$via['integration_status']] ?? $via['integration_status'] }}</span></li>
+            <li class="split"><span class="muted">Sunucu tarafı izin toplama</span>@if ($via['acquisition_allowed'])<span class="badge b-pass">Açık</span>@else<span class="badge b-bad">Kapalı</span>@endif</li>
         </ul>
         @unless ($via['acquisition_allowed'])<p class="small"><strong>{{ $via['detail'] }}</strong></p>@endunless
         @if ($canManageVia && $via['next_form_statuses'] !== [])

@@ -116,6 +116,7 @@ enum AuditAction: string
     case SiteReferenceLogoChanged = 'site.reference_logo_changed';
     case ViaConfigured = 'consent.via_configured';
     case ViaFormStatusChanged = 'consent.via_form_status_changed';
+    case ViaDomainActivationConfirmed = 'consent.via_domain_activation_confirmed';
     case ViaConsentCompleted = 'consent.via_completed';
     case ViaConsentFailed = 'consent.via_failed';
     case ViaRetCompleted = 'consent.via_ret_completed';

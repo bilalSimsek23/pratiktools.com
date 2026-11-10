@@ -56,7 +56,7 @@ final class EmailLaunchReadiness
         'TEMPLATE' => [self::DELIVERY, 'Yayınlanmış kampanya şablonu'],
         'SENDING_MODE' => [self::DELIVERY, 'Gönderim modu'],
         'LIVE_DISPATCH' => [self::DELIVERY, 'Canlı dispatch'],
-        'VIA_FRAME' => [self::ACQUISITION, 'Yeni izin toplama kanalı (İYS ViA Frame / OTP)'],
+        'VIA_FRAME' => [self::ACQUISITION, 'Yeni izin toplama kanalı (İYS ViA Frame)'],
         'IYS_API_ACCESS' => [self::ACQUISITION, 'İYS API erişimi'],
     ];
 
@@ -209,9 +209,13 @@ final class EmailLaunchReadiness
     {
         $config = $this->via->current();
         $frame = ViaFrameReadiness::of($config);
-        // Configuration ready is the best the panel can know: İYS's domain
-        // (DNS) activation of the Frame is confirmed by İYS, not recorded here.
-        $c = ['VIA_FRAME' => [false, 'ViA Frame: '.$frame->label().'. İYS alan adı (DNS) aktivasyonu İYS tarafından teyit edilir; panel doğrulamaz. Mevcut izinli kitleye gönderimi engellemez.']];
+        // Ready = complete configuration plus the Super Admin's confirmation
+        // of İYS's domain activation; Frame events never count. A WARN at
+        // most: the acquisition group never blocks sending.
+        $missing = collect($frame->checks)->reject(fn ($check) => $check['ok'])->pluck('label')->implode(', ');
+        $c = ['VIA_FRAME' => $frame->ready()
+            ? [true, 'ViA Frame hazır: '.$config?->activatedOrigin().' için İYS domain aktivasyonu teyitli. Frame olayları izin kaydı oluşturmaz.']
+            : [false, 'ViA Frame: '.$frame->label().($missing !== '' ? " (eksik: {$missing})" : '').'. Mevcut izinli kitleye gönderimi engellemez.']];
         if ($strategy['strategy'] !== 'direct_api') {
             $c['IYS_API_ACCESS'] = $strategy['direct_api']['available']
                 ? [true, 'İYS API durum senkronu var.']
